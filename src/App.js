@@ -1,22 +1,22 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Login from './Login';
-import Register from './Register';
-import './App.css';
-import ViewUsers from './ViewUsers';
+import React from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import WelcomePage from "./Welcome"; // file is still Welcome.js
 
+import Login from "./Login";
+import Register from "./Register";
+import ViewUsers from "./ViewUsers"; // Or your actual users page
 
 function App() {
   return (
-    <BrowserRouter>
+    <Router>
       <Routes>
+        <Route path="/" element={<WelcomePage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/users" element={<ViewUsers />} />
       </Routes>
-    </BrowserRouter>
+    </Router>
   );
 }
 
 export default App;
-

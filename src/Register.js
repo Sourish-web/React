@@ -1,12 +1,18 @@
-import React from "react";
+import React, { useState } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 function Register() {
-  const [register, setRegister] = React.useState({
+  const [register, setRegister] = useState({
     name: "",
     email: "",
     password: "",
+    phone: "",
+    birthDate: "",
+    panCard: "",
   });
+
+  const navigate = useNavigate();
 
   const handleChange = (e) => {
     setRegister({
@@ -22,7 +28,8 @@ function Register() {
     try {
       const response = await axios.post("http://localhost:8090/auth/signup", register);
       console.log(response.data);
-      alert("User added successfully!");
+      alert("User registered successfully!");
+      navigate("/login");
     } catch (error) {
       console.error("Error while registering:", error);
       alert("Failed to register user.");
@@ -34,42 +41,30 @@ function Register() {
       <form onSubmit={handleSubmit}>
         <h2>Register</h2>
 
-        <label htmlFor="username">Name:</label>
-        <input
-          type="text"
-          id="username"
-          name="name"
-          placeholder="Enter your name"
-          value={register.name}
-          onChange={handleChange}
-        />
-        <br />
-        <br />
+        <label>Name:</label>
+        <input type="text" name="name" value={register.name} onChange={handleChange} />
 
-        <label htmlFor="email">Email:</label>
-        <input
-          type="email"
-          id="email"
-          name="email"
-          placeholder="Enter your email"
-          value={register.email}
-          onChange={handleChange}
-        />
-        <br />
-        <br />
+        <br /><br />
+        <label>Email:</label>
+        <input type="email" name="email" value={register.email} onChange={handleChange} />
 
-        <label htmlFor="password">Password:</label>
-        <input
-          type="password"
-          id="password"
-          name="password"
-          placeholder="Enter your password"
-          value={register.password}
-          onChange={handleChange}
-        />
-        <br />
-        <br />
+        <br /><br />
+        <label>Password:</label>
+        <input type="password" name="password" value={register.password} onChange={handleChange} />
 
+        <br /><br />
+        <label>Phone Number:</label>
+        <input type="text" name="phone" value={register.phone} onChange={handleChange} />
+
+        <br /><br />
+        <label>Birth Date:</label>
+        <input type="date" name="birthDate" value={register.birthDate} onChange={handleChange} />
+
+        <br /><br />
+        <label>PAN Card:</label>
+        <input type="text" name="panCard" value={register.panCard} onChange={handleChange} />
+
+        <br /><br />
         <button type="submit">Register</button>
       </form>
     </div>
@@ -77,4 +72,3 @@ function Register() {
 }
 
 export default Register;
-
