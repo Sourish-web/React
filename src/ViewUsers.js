@@ -1,31 +1,22 @@
 import axios from "axios";
-import React, { useEffect, useState } from "react"; // ✅ Added useState here
+import React, { useEffect } from "react";
 import Cookies from "universal-cookie";
+import { useNavigate } from "react-router-dom";
 
 function ViewUsers() {
   const cookies = new Cookies();
-
-  const [users, setUsers] = useState([]);
+  const navigate = useNavigate();
 
   const fetchAllUsers = async () => {
-
     const token = cookies.get("token");
     const baseURL = "http://localhost:8090/getUsers";
 
     try {
-      const response = await axios.get(baseURL, {
+      await axios.get(baseURL, {
         headers: {
-          'Authorization': `Bearer ${token}`, // ✅ Corrected template literal
+          Authorization: `Bearer ${token}`,
         },
       });
-
-      console.log(response.data);
-
-      if (Array.isArray(response.data)) {
-        setUsers(response.data);
-      } else {
-        console.log("Response data is not in valid format");
-      }
     } catch (error) {
       console.log("Error fetching users:", error);
     }
@@ -35,24 +26,48 @@ function ViewUsers() {
     fetchAllUsers();
   }, []);
 
-  return (
-    <>
-      <h1>This is all users in our system</h1>
+  const cardStyle = {
+    border: "1px solid #ccc",
+    padding: "20px",
+    margin: "10px",
+    width: "200px",
+    textAlign: "center",
+    borderRadius: "8px",
+    boxShadow: "2px 2px 10px rgba(0,0,0,0.1)",
+    cursor: "pointer",
+    background: "#f9f9f9",
+    transition: "transform 0.2s",
+  };
 
-      <div>
-        {users.length > 0 ? (
-          <ul>
-            {users.map((user) => (
-              <li key={user.id}>
-                Name: {user.name}, Email: {user.email}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>No records found</p>
-        )}
+  const containerStyle = {
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    marginTop: "50px",
+  };
+
+  const handleRedirect = (path) => {
+    navigate(path);
+  };
+
+  return (
+    <div style={{ padding: "20px" }}>
+      <h2 style={{ marginBottom: "20px", textAlign: "center" }}>Explore Features</h2>
+      <div style={containerStyle}>
+        <div style={cardStyle} onClick={() => handleRedirect("/transactions")}>
+          📒 Transactions
+        </div>
+        <div style={cardStyle} onClick={() => handleRedirect("/budget")}>
+          💰 Budget
+        </div>
+        <div style={cardStyle} onClick={() => handleRedirect("/portfolio")}>
+          📈 Portfolio
+        </div>
+        <div style={cardStyle} onClick={() => handleRedirect("/reports")}>
+          📊 Reports
+        </div>
       </div>
-    </>
+    </div>
   );
 }
 

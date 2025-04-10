@@ -1,0 +1,30 @@
+.transactions-container {
+    padding: 20px;
+    max-width: 800px;
+    margin: auto;
+  }
+  
+  .transaction-form input,
+  .transaction-form select,
+  .transaction-form button {
+    margin: 5px;
+    padding: 8px;
+  }
+  
+  .filter-section {
+    margin-top: 20px;
+  }
+  
+  .transaction-list ul {
+    list-style-type: none;
+    padding: 0;
+  }
+  
+  .transaction-list li {
+    margin: 10px 0;
+  }
+  
+  .chart-section {
+    margin-top: 30px;
+  }
+  
