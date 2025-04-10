@@ -66,6 +66,9 @@ function ViewUsers() {
         <div style={cardStyle} onClick={() => handleRedirect("/reports")}>
           📊 Reports
         </div>
+        <div style={cardStyle} onClick={() => handleRedirect("/goals")}>
+          🎯 Goals
+        </div>
       </div>
     </div>
   );

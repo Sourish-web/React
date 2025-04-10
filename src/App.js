@@ -8,6 +8,7 @@ import Transactions from "./Transactions";
 import Budget from "./Budget";
 import Portfolio from "./Portfolio";
 import Reports from "./Reports";
+import Goal from "./Goal";
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
         <Route path="/budget" element={<Budget />} />
         <Route path="/portfolio" element={<Portfolio />} />
         <Route path="/reports" element={<Reports />} />
+        <Route path="/goals" element={<Goal />} />
       </Routes>
     </Router>
   );
