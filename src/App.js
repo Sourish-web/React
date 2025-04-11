@@ -9,6 +9,8 @@ import Budget from "./Budget";
 import Portfolio from "./Portfolio";
 import Reports from "./Reports";
 import Goal from "./Goal";
+import Subscription from "./Subscription";
+import Settings from "./Settings";
 
 function App() {
   return (
@@ -23,6 +25,8 @@ function App() {
         <Route path="/portfolio" element={<Portfolio />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/goals" element={<Goal />} />
+        <Route path="/subscriptions" element={<Subscription />} />
+        <Route path="/settings" element={<Settings />} />
       </Routes>
     </Router>
   );
