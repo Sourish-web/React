@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import { Line } from 'react-chartjs-2';
-
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import Cookies from "universal-cookie";
+import { useNavigate } from "react-router-dom";
+import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   LineElement,
@@ -11,7 +12,7 @@ import {
   Title,
   Tooltip,
   Legend
-} from 'chart.js';
+} from "chart.js";
 
 ChartJS.register(
   LineElement,
@@ -29,41 +30,61 @@ const Portfolio = () => {
   const [error, setError] = useState(null);
   const [formData, setFormData] = useState({
     id: null,
-    assetName: '',
-    assetType: '',
-    quantity: '',
-    purchasePrice: '',
-    currentPrice: ''
+    assetName: "",
+    assetType: "",
+    quantity: "",
+    purchasePrice: "",
+    currentPrice: ""
   });
 
   const isEditing = formData.id !== null;
+  const cookies = new Cookies();
+  const navigate = useNavigate();
+  const API_URL = "http://localhost:8090";
 
-  useEffect(() => {
-    fetchPortfolio();
-  }, []);
+  const getAuthToken = () => cookies.get("token");
 
   const fetchPortfolio = async () => {
+    const token = getAuthToken();
+    if (!token) {
+      alert("You are not authenticated");
+      navigate("/login");
+      return;
+    }
+
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:8090/getAssets');
+      const response = await axios.get(`${API_URL}/getAssets`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       setPortfolio(response.data);
       setError(null);
-    } catch (error) {
-      console.error('Error fetching portfolio', error);
-      setError('Failed to fetch portfolio. Please try again.');
+    } catch (err) {
+      console.error("Error fetching portfolio", err);
+      setError("Failed to fetch portfolio. Please try again.");
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchPortfolio();
+  }, []);
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleAddOrUpdate = async () => {
+    const token = getAuthToken();
+    if (!token) {
+      alert("You are not authenticated");
+      navigate("/login");
+      return;
+    }
+
     try {
-      const endpoint = isEditing ? '/updateAsset' : '/addAsset';
-      const method = 'post';
+      const endpoint = isEditing ? "/updateAsset" : "/addAsset";
       const payload = {
         ...formData,
         quantity: parseFloat(formData.quantity),
@@ -71,19 +92,22 @@ const Portfolio = () => {
         currentPrice: parseFloat(formData.currentPrice)
       };
 
-      await axios[method](`http://localhost:8090${endpoint}`, payload);
+      await axios.post(`${API_URL}${endpoint}`, payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
       setFormData({
         id: null,
-        assetName: '',
-        assetType: '',
-        quantity: '',
-        purchasePrice: '',
-        currentPrice: ''
+        assetName: "",
+        assetType: "",
+        quantity: "",
+        purchasePrice: "",
+        currentPrice: ""
       });
       fetchPortfolio();
-    } catch (error) {
-      console.error('Error saving asset', error);
-      setError('Failed to save asset. Please check inputs.');
+    } catch (err) {
+      console.error("Error saving asset", err);
+      setError("Failed to save asset. Please check inputs.");
     }
   };
 
@@ -92,12 +116,21 @@ const Portfolio = () => {
   };
 
   const handleDelete = async (id) => {
+    const token = getAuthToken();
+    if (!token) {
+      alert("You are not authenticated");
+      navigate("/login");
+      return;
+    }
+
     try {
-      await axios.get(`http://localhost:8090/deleteAsset/${id}`);
+      await axios.get(`${API_URL}/deleteAsset/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       fetchPortfolio();
-    } catch (error) {
-      console.error('Error deleting asset', error);
-      setError('Failed to delete asset.');
+    } catch (err) {
+      console.error("Error deleting asset", err);
+      setError("Failed to delete asset.");
     }
   };
 
@@ -110,10 +143,10 @@ const Portfolio = () => {
     labels: portfolio.map((asset) => asset.assetName),
     datasets: [
       {
-        label: 'Value in USD',
+        label: "Value in USD",
         data: portfolio.map((asset) => (asset.currentPrice || 0) * (asset.quantity || 0)),
-        backgroundColor: 'rgba(54, 162, 235, 0.2)',
-        borderColor: '#36A2EB',
+        backgroundColor: "rgba(54, 162, 235, 0.2)",
+        borderColor: "#36A2EB",
         borderWidth: 2,
         tension: 0.3,
         fill: true
@@ -124,18 +157,17 @@ const Portfolio = () => {
   const chartOptions = {
     responsive: true,
     plugins: {
-      legend: { position: 'top' },
-      title: { display: true, text: 'Portfolio Value by Asset' }
+      legend: { position: "top" },
+      title: { display: true, text: "Portfolio Value by Asset" }
     }
   };
 
   return (
-    <div style={{ padding: '30px' }}>
+    <div className="p-6">
       <h2 className="text-2xl font-bold mb-4">My Investment Portfolio</h2>
 
-      {/* Form */}
       <div className="mb-6 p-4 border rounded bg-gray-50 shadow">
-        <h3 className="text-xl font-semibold mb-2">{isEditing ? 'Edit Asset' : 'Add New Asset'}</h3>
+        <h3 className="text-xl font-semibold mb-2">{isEditing ? "Edit Asset" : "Add New Asset"}</h3>
         <div className="grid grid-cols-2 gap-4">
           <input name="assetName" value={formData.assetName} onChange={handleInputChange} placeholder="Asset Name" className="p-2 border rounded" />
           <input name="assetType" value={formData.assetType} onChange={handleInputChange} placeholder="Asset Type" className="p-2 border rounded" />
@@ -143,23 +175,17 @@ const Portfolio = () => {
           <input name="purchasePrice" value={formData.purchasePrice} onChange={handleInputChange} placeholder="Purchase Price" type="number" className="p-2 border rounded" />
           <input name="currentPrice" value={formData.currentPrice} onChange={handleInputChange} placeholder="Current Price" type="number" className="p-2 border rounded" />
         </div>
-        <button
-          onClick={handleAddOrUpdate}
-          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          {isEditing ? 'Update Asset' : 'Add Asset'}
+        <button onClick={handleAddOrUpdate} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+          {isEditing ? "Update Asset" : "Add Asset"}
         </button>
       </div>
 
-      {/* Error */}
       {error && <p className="text-red-600 font-medium mb-4">{error}</p>}
 
-      {/* Loading */}
       {loading ? (
         <p>Loading portfolio...</p>
       ) : (
         <>
-          {/* Table */}
           <div className="mb-6 overflow-x-auto">
             <table className="w-full table-auto border shadow-md rounded">
               <thead className="bg-blue-100 text-left">
@@ -174,8 +200,8 @@ const Portfolio = () => {
                 </tr>
               </thead>
               <tbody>
-                {portfolio.map((asset, index) => (
-                  <tr key={index} className="border-b hover:bg-blue-50">
+                {portfolio.map((asset) => (
+                  <tr key={asset.id} className="border-b hover:bg-blue-50">
                     <td className="p-2">{asset.assetName}</td>
                     <td className="p-2 capitalize">{asset.assetType}</td>
                     <td className="p-2">{asset.quantity}</td>
@@ -185,16 +211,10 @@ const Portfolio = () => {
                       ${((asset.currentPrice || 0) * (asset.quantity || 0)).toFixed(2)}
                     </td>
                     <td className="p-2 space-x-2">
-                      <button
-                        className="text-blue-600 hover:underline"
-                        onClick={() => handleEdit(asset)}
-                      >
+                      <button className="text-blue-600 hover:underline" onClick={() => handleEdit(asset)}>
                         Edit
                       </button>
-                      <button
-                        className="text-red-600 hover:underline"
-                        onClick={() => handleDelete(asset.id)}
-                      >
+                      <button className="text-red-600 hover:underline" onClick={() => handleDelete(asset.id)}>
                         Delete
                       </button>
                     </td>
@@ -204,15 +224,12 @@ const Portfolio = () => {
             </table>
           </div>
 
-          {/* Total Value */}
           <div className="mb-6">
             <h3 className="text-xl font-medium mb-2">
-              Total Portfolio Value:{' '}
-              <span className="text-green-700">${totalValue.toFixed(2)}</span>
+              Total Portfolio Value: <span className="text-green-700">${totalValue.toFixed(2)}</span>
             </h3>
           </div>
 
-          {/* Chart */}
           <div>
             <Line data={chartData} options={chartOptions} />
           </div>

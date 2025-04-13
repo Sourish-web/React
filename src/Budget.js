@@ -1,153 +1,209 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import Cookies from "universal-cookie";
+import { useNavigate } from "react-router-dom";
 
-function Budget() {
+const Budget = () => {
   const [budgets, setBudgets] = useState([]);
-  const [formData, setFormData] = useState({
+  const [form, setForm] = useState({
+    id: null,
     amount: "",
-    period: "monthly",
-    spent: 0,
+    period: "",
+    spent: "",
     startDate: "",
     endDate: "",
   });
-  const [editMode, setEditMode] = useState(false);
-  const [editId, setEditId] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
 
-  const API_BASE = "http://localhost:8090";
+  const cookies = new Cookies();
+  const navigate = useNavigate();
+  const API_URL = "http://localhost:8090";
+
+  const getAuthToken = () => cookies.get("token");
+
+  const fetchBudgets = async () => {
+    const token = getAuthToken();
+    if (!token) {
+      alert("You are not authenticated");
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const res = await axios.get(`${API_URL}/getBudget`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      setBudgets(res.data);
+    } catch (err) {
+      console.error("Failed to fetch budgets:", err);
+      alert("Failed to fetch budgets.");
+    }
+  };
 
   useEffect(() => {
     fetchBudgets();
   }, []);
 
-  const fetchBudgets = async () => {
-    const response = await axios.get(`${API_BASE}/getBudget`);
-    setBudgets(response.data);
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const token = getAuthToken();
 
-    if (editMode) {
-      await axios.post(`${API_BASE}/updateBudget`, {
-        ...formData,
-        id: editId,
-      });
-    } else {
-      await axios.post(`${API_BASE}/addBudget`, formData);
+    if (!token) {
+      alert("You are not authenticated");
+      navigate("/login");
+      return;
     }
 
-    setFormData({
-      amount: "",
-      period: "monthly",
-      spent: 0,
-      startDate: "",
-      endDate: "",
-    });
-    setEditMode(false);
-    setEditId(null);
-    fetchBudgets();
-  };
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const endpoint = isEditing ? "/updateBudget" : "/addBudget";
+      await axios.post(`${API_URL}${endpoint}`, form, { headers });
 
-  const handleDelete = async (id) => {
-    await axios.get(`${API_BASE}/Budget/delete/${id}`);
-    fetchBudgets();
+      setForm({
+        id: null,
+        amount: "",
+        period: "",
+        spent: "",
+        startDate: "",
+        endDate: "",
+      });
+      setIsEditing(false);
+      fetchBudgets();
+    } catch (err) {
+      console.error("Error submitting budget:", err);
+      alert("Error submitting budget.");
+    }
   };
 
   const handleEdit = (budget) => {
-    setFormData({
-      amount: budget.amount,
-      period: budget.period,
-      spent: budget.spent,
-      startDate: budget.startDate,
-      endDate: budget.endDate,
-    });
-    setEditMode(true);
-    setEditId(budget.id);
+    setForm(budget);
+    setIsEditing(true);
   };
 
-  const usagePercentage = (budget) => {
-    if (!budget.amount || budget.amount === 0) return 0;
-    return ((budget.spent / budget.amount) * 100).toFixed(2);
+  const handleDelete = async (id) => {
+    const token = getAuthToken();
+    if (!token) {
+      alert("You are not authenticated");
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      await axios.get(`${API_URL}/Budget/delete/${id}`, { headers });
+      fetchBudgets();
+    } catch (err) {
+      console.error("Error deleting budget:", err);
+      alert("Error deleting budget.");
+    }
   };
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h2>{editMode ? "Edit Budget" : "Add Budget"}</h2>
-      <form onSubmit={handleSubmit} style={{ marginBottom: "30px" }}>
+    <div className="container p-4">
+      <h2 className="text-2xl font-bold mb-4">{isEditing ? "Edit" : "Add"} Budget</h2>
+
+      <form onSubmit={handleSubmit} className="grid gap-4 mb-6">
         <input
           type="number"
+          name="amount"
+          value={form.amount}
+          onChange={handleChange}
           placeholder="Amount"
-          value={formData.amount}
-          onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
           required
+          className="p-2 border rounded"
         />
-        <select
-          value={formData.period}
-          onChange={(e) => setFormData({ ...formData, period: e.target.value })}
-        >
-          <option value="monthly">Monthly</option>
-          <option value="weekly">Weekly</option>
-        </select>
+        <input
+          type="text"
+          name="period"
+          value={form.period}
+          onChange={handleChange}
+          placeholder="Period (e.g., monthly, weekly)"
+          required
+          className="p-2 border rounded"
+        />
         <input
           type="number"
+          name="spent"
+          value={form.spent}
+          onChange={handleChange}
           placeholder="Spent"
-          value={formData.spent}
-          onChange={(e) => setFormData({ ...formData, spent: e.target.value })}
+          className="p-2 border rounded"
         />
         <input
           type="date"
-          value={formData.startDate}
-          onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+          name="startDate"
+          value={form.startDate}
+          onChange={handleChange}
           required
+          className="p-2 border rounded"
         />
         <input
           type="date"
-          value={formData.endDate}
-          onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+          name="endDate"
+          value={form.endDate}
+          onChange={handleChange}
           required
+          className="p-2 border rounded"
         />
-        <button type="submit">{editMode ? "Update" : "Add"}</button>
+        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">
+          {isEditing ? "Update" : "Add"} Budget
+        </button>
       </form>
 
-      <h3>All Budgets</h3>
-      <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-        {budgets.map((budget) => (
-          <div
-            key={budget.id}
-            style={{
-              border: "1px solid #ccc",
-              padding: "15px",
-              borderRadius: "10px",
-              boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-            }}
-          >
-            <p><strong>Amount:</strong> ₹{budget.amount}</p>
-            <p><strong>Spent:</strong> ₹{budget.spent}</p>
-            <p><strong>Period:</strong> {budget.period}</p>
-            <p><strong>Start Date:</strong> {budget.startDate}</p>
-            <p><strong>End Date:</strong> {budget.endDate}</p>
-            <div style={{ height: "20px", background: "#eee", borderRadius: "10px", overflow: "hidden", marginTop: "10px" }}>
-              <div
-                style={{
-                  width: `${usagePercentage(budget)}%`,
-                  background: usagePercentage(budget) > 100 ? "red" : "#4caf50",
-                  color: "white",
-                  textAlign: "center",
-                }}
-              >
-                {usagePercentage(budget)}%
-              </div>
-            </div>
-            {usagePercentage(budget) > 100 && (
-              <p style={{ color: "red", fontWeight: "bold" }}>⚠ Over Budget!</p>
-            )}
-            <button onClick={() => handleEdit(budget)} style={{ marginRight: "10px" }}>Edit</button>
-            <button onClick={() => handleDelete(budget.id)}>Delete</button>
-          </div>
-        ))}
-      </div>
+      <h2 className="text-xl font-semibold mb-2">Budgets List</h2>
+      <table className="w-full border-collapse border border-gray-300">
+        <thead>
+          <tr className="bg-gray-200">
+            <th className="border p-2">Amount</th>
+            <th className="border p-2">Period</th>
+            <th className="border p-2">Spent</th>
+            <th className="border p-2">Start Date</th>
+            <th className="border p-2">End Date</th>
+            <th className="border p-2">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {budgets.map((budget) => (
+            <tr key={budget.id} className="text-center">
+              <td className="border p-2">{budget.amount}</td>
+              <td className="border p-2">{budget.period}</td>
+              <td className="border p-2">{budget.spent}</td>
+              <td className="border p-2">{budget.startDate}</td>
+              <td className="border p-2">{budget.endDate}</td>
+              <td className="border p-2 space-x-2">
+                <button
+                  onClick={() => handleEdit(budget)}
+                  className="bg-yellow-400 px-3 py-1 rounded"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => handleDelete(budget.id)}
+                  className="bg-red-500 text-white px-3 py-1 rounded"
+                >
+                  Delete
+                </button>
+              </td>
+            </tr>
+          ))}
+          {budgets.length === 0 && (
+            <tr>
+              <td colSpan="6" className="text-center p-4">
+                No budgets found.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
     </div>
   );
-}
+};
 
 export default Budget;
