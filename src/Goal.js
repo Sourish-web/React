@@ -1,146 +1,127 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { CircularProgressbar, buildStyles } from 'react-circular-progressbar';
-import 'react-circular-progressbar/dist/styles.css';
 
-const Goals = () => {
-  const [goals, setGoals] = useState([]);
-  const [newGoal, setNewGoal] = useState({
-    name: '',
-    targetAmount: '',
-    targetDate: ''
-  });
+const Transaction = () => {
+    const [transactions, setTransactions] = useState([]);
+    const [description, setDescription] = useState('');
+    const [amount, setAmount] = useState('');
+    const [category, setCategory] = useState('');
+    const [transactionDate, setTransactionDate] = useState('');
+    const [error, setError] = useState('');
 
-  const [contribution, setContribution] = useState({});
+    const token = localStorage.getItem('jwtToken'); // Assuming JWT token is saved in local storage
 
-  useEffect(() => {
-    fetchGoals();
-  }, []);
+    // Fetch all transactions on component mount
+    useEffect(() => {
+        fetchTransactions();
+    }, []);
 
-  const fetchGoals = async () => {
-    const res = await axios.get('http://localhost:8090/getGoals');
-    setGoals(res.data);
-  };
-
-  const handleAddGoal = async () => {
-    if (!newGoal.name || !newGoal.targetAmount || !newGoal.targetDate) return alert('Fill all fields');
-
-    await axios.post('http://localhost:8090/addGoal', {
-      ...newGoal,
-      targetAmount: parseFloat(newGoal.targetAmount),
-      targetDate: newGoal.targetDate
-    });
-
-    setNewGoal({ name: '', targetAmount: '', targetDate: '' });
-    fetchGoals();
-  };
-
-  const handleContributionChange = (id, value) => {
-    setContribution({ ...contribution, [id]: value });
-  };
-
-  const addContribution = async (goal) => {
-    const amountToAdd = parseFloat(contribution[goal.id] || 0);
-    const updatedGoal = {
-      ...goal,
-      currentAmount: parseFloat(goal.currentAmount || 0) + amountToAdd
+    const fetchTransactions = async () => {
+        try {
+            const response = await axios.get('http://localhost:8090/transaction/all', {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+            setTransactions(response.data);
+        } catch (err) {
+            console.error('Error fetching transactions:', err);
+        }
     };
 
-    await axios.post('http://localhost:8090/updateGoal', updatedGoal);
-    fetchGoals();
-  };
+    // Handle form submission to add a transaction
+    const handleSubmit = async (e) => {
+        e.preventDefault();
 
-  const deleteGoal = async (id) => {
-    await axios.get(`http://localhost:8090/deleteGoal/${id}`);
-    fetchGoals();
-  };
+        if (!description || !amount || !category || !transactionDate) {
+            setError('All fields are required!');
+            return;
+        }
 
-  return (
-    <div className="p-5 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">🎯 Financial Goals</h1>
+        const transactionData = {
+            description,
+            amount: parseFloat(amount),
+            category,
+            transactionDate,
+        };
 
-      <div className="bg-white rounded-xl shadow-md p-4 mb-6">
-        <h2 className="text-lg font-semibold mb-2">Add New Goal</h2>
-        <input
-          type="text"
-          placeholder="Goal name"
-          value={newGoal.name}
-          onChange={(e) => setNewGoal({ ...newGoal, name: e.target.value })}
-          className="border p-2 mr-2 rounded"
-        />
-        <input
-          type="number"
-          placeholder="Target amount"
-          value={newGoal.targetAmount}
-          onChange={(e) => setNewGoal({ ...newGoal, targetAmount: e.target.value })}
-          className="border p-2 mr-2 rounded"
-        />
-        <input
-          type="date"
-          value={newGoal.targetDate}
-          onChange={(e) => setNewGoal({ ...newGoal, targetDate: e.target.value })}
-          className="border p-2 mr-2 rounded"
-        />
-        <button onClick={handleAddGoal} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-          Add Goal
-        </button>
-      </div>
+        try {
+            const response = await axios.post('http://localhost:8090/transaction/add', transactionData, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        {goals.map((goal) => {
-          const percentage = Math.min(
-            ((parseFloat(goal.currentAmount || 0) / parseFloat(goal.targetAmount)) * 100).toFixed(1),
-            100
-          );
+            if (response.status === 200) {
+                // Reset form after successful submission
+                setDescription('');
+                setAmount('');
+                setCategory('');
+                setTransactionDate('');
+                setError('');
+                fetchTransactions(); // Fetch updated transactions list
+            }
+        } catch (err) {
+            console.error('Error adding transaction:', err);
+            setError('There was an issue adding the transaction.');
+        }
+    };
 
-          return (
-            <div key={goal.id} className="bg-white p-4 rounded-xl shadow-md relative">
-              <button
-                onClick={() => deleteGoal(goal.id)}
-                className="absolute top-2 right-2 text-red-500 hover:text-red-700"
-              >
-                ❌
-              </button>
+    return (
+        <div>
+            <h2>Add New Transaction</h2>
+            <form onSubmit={handleSubmit}>
+                {error && <div style={{ color: 'red' }}>{error}</div>}
+                <div>
+                    <label>Description:</label>
+                    <input
+                        type="text"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        required
+                    />
+                </div>
+                <div>
+                    <label>Amount:</label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        required
+                    />
+                </div>
+                <div>
+                    <label>Category:</label>
+                    <input
+                        type="text"
+                        value={category}
+                        onChange={(e) => setCategory(e.target.value)}
+                        required
+                    />
+                </div>
+                <div>
+                    <label>Transaction Date:</label>
+                    <input
+                        type="date"
+                        value={transactionDate}
+                        onChange={(e) => setTransactionDate(e.target.value)}
+                        required
+                    />
+                </div>
+                <button type="submit">Add Transaction</button>
+            </form>
 
-              <h3 className="text-xl font-semibold mb-2">{goal.name}</h3>
-              <p>🎯 Target: ₹{goal.targetAmount}</p>
-              <p>📅 Deadline: {goal.targetDate}</p>
-              <p>Status: <span className="font-semibold">{goal.status}</span></p>
-
-              <div className="my-3 w-24 h-24">
-                <CircularProgressbar
-                  value={percentage}
-                  text={`${percentage}%`}
-                  styles={buildStyles({
-                    pathColor: '#10b981',
-                    textColor: '#111827',
-                    trailColor: '#d1d5db',
-                    textSize: '16px',
-                  })}
-                />
-              </div>
-
-              <div className="mt-2">
-                <input
-                  type="number"
-                  placeholder="Add ₹ amount"
-                  value={contribution[goal.id] || ''}
-                  onChange={(e) => handleContributionChange(goal.id, e.target.value)}
-                  className="border p-2 rounded w-full mb-2"
-                />
-                <button
-                  onClick={() => addContribution(goal)}
-                  className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 w-full"
-                >
-                  Add Contribution
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
+            <h3>Your Transactions</h3>
+            <ul>
+                {transactions.map((transaction) => (
+                    <li key={transaction.id}>
+                        {transaction.description} - {transaction.amount} - {transaction.category} - {transaction.transactionDate}
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
 };
 
-export default Goals;
+export default Transaction;

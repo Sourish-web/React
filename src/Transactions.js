@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import Cookies from "universal-cookie";
+import { useNavigate } from "react-router-dom";
 
 const Transaction = () => {
   const [transactions, setTransactions] = useState([]);
@@ -12,15 +14,34 @@ const Transaction = () => {
   });
   const [isEditing, setIsEditing] = useState(false);
 
+  const cookies = new Cookies();
+  const navigate = useNavigate();
   const API_URL = "http://localhost:8090";
+
+  // Retrieve token from cookies
+  const getAuthToken = () => {
+    return cookies.get("token"); // Getting the token from cookies
+  };
 
   // Fetch all transactions
   const fetchTransactions = async () => {
+    const token = getAuthToken();
+    if (!token) {
+      alert("You are not authenticated");
+      navigate("/login");
+      return;
+    }
+
     try {
-      const res = await axios.get(`${API_URL}/getTransaction`);
+      const res = await axios.get(`${API_URL}/transaction/all`, {
+        headers: {
+          Authorization: `Bearer ${token}`, // Attach JWT token to request
+        },
+      });
       setTransactions(res.data);
     } catch (err) {
       console.error("Failed to fetch transactions:", err);
+      alert("Failed to fetch transactions.");
     }
   };
 
@@ -37,13 +58,24 @@ const Transaction = () => {
   // Handle add/update transaction
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const token = getAuthToken();
+
+    if (!token) {
+      alert("You are not authenticated");
+      navigate("/login");
+      return;
+    }
 
     try {
+      const headers = {
+        Authorization: `Bearer ${token}`,
+      };
+
       if (isEditing) {
-        await axios.post(`${API_URL}/updateTransaction`, form);
+        await axios.post(`${API_URL}/transaction/update`, form, { headers });
         setIsEditing(false);
       } else {
-        await axios.post(`${API_URL}/addTransaction`, form);
+        await axios.post(`${API_URL}/transaction/add`, form, { headers });
       }
 
       setForm({
@@ -56,6 +88,7 @@ const Transaction = () => {
       fetchTransactions();
     } catch (err) {
       console.error("Error submitting transaction:", err);
+      alert("Error submitting transaction.");
     }
   };
 
@@ -67,11 +100,22 @@ const Transaction = () => {
 
   // Delete transaction
   const handleDelete = async (id) => {
+    const token = getAuthToken();
+    if (!token) {
+      alert("You are not authenticated");
+      navigate("/login");
+      return;
+    }
+
     try {
-      await axios.get(`${API_URL}/deleteTransaction/${id}`);
+      const headers = {
+        Authorization: `Bearer ${token}`,
+      };
+      await axios.get(`${API_URL}/transaction/delete/${id}`, { headers });
       fetchTransactions();
     } catch (err) {
       console.error("Error deleting transaction:", err);
+      alert("Error deleting transaction.");
     }
   };
 
