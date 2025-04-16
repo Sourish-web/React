@@ -15,6 +15,7 @@ const Subscription = () => {
     category: "",
   });
   const [isEditing, setIsEditing] = useState(false);
+  const [razorpayOrderId, setRazorpayOrderId] = useState(null);
 
   const cookies = new Cookies();
   const navigate = useNavigate();
@@ -71,7 +72,9 @@ const Subscription = () => {
         await axios.post(`${API_URL}/updateSubscription`, form, { headers });
         setIsEditing(false);
       } else {
-        await axios.post(`${API_URL}/addSubscription`, form, { headers });
+        const res = await axios.post(`${API_URL}/addSubscription`, form, { headers });
+        setRazorpayOrderId(res.data.razorpayOrderId);  // Get Razorpay order ID from backend
+        triggerRazorpayPayment(res.data.razorpayOrderId, form.cost);
       }
 
       setForm({
@@ -87,6 +90,69 @@ const Subscription = () => {
     } catch (err) {
       console.error("Error submitting subscription:", err);
       alert("Error submitting subscription.");
+    }
+  };
+
+  const loadRazorpayScript = () => {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = resolve;
+      script.onerror = reject;
+      document.body.appendChild(script);
+    });
+  };
+
+  const triggerRazorpayPayment = async (orderId, amount) => {
+    try {
+      await loadRazorpayScript(); // Ensure the Razorpay script is loaded before opening the payment window
+
+      const options = {
+        key: "rzp_test_uvMwjsQv3hPcCl", // Replace with your Razorpay API key
+        amount: amount * 100, // Convert amount to paise
+        currency: "INR",
+        order_id: orderId,
+        handler: async function (response) {
+          const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = response;
+
+          const token = getAuthToken();
+          if (!token) {
+            alert("You are not authenticated");
+            navigate("/login");
+            return;
+          }
+
+          try {
+            // Update payment status on the backend after successful payment
+            await axios.post(
+              `${API_URL}/updatePaymentStatus`,
+              {
+                razorpayOrderId: razorpay_order_id,
+                status: "PAID",
+              },
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              }
+            );
+            alert("Payment successful!");
+            fetchSubscriptions();
+          } catch (err) {
+            console.error("Failed to update payment status:", err);
+            alert("Payment failed.");
+          }
+        },
+        theme: {
+          color: "#F37254",
+        },
+      };
+
+      const paymentObject = new window.Razorpay(options); // Correct way to instantiate Razorpay
+      paymentObject.open();
+    } catch (error) {
+      console.error("Error loading Razorpay script", error);
+      alert("Failed to load Razorpay.");
     }
   };
 
