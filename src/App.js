@@ -11,6 +11,7 @@ import Reports from "./Reports";
 import Goal from "./Goal";
 import Subscription from "./Subscription";
 import Settings from "./Settings";
+import CombinedTracker from "./CombinedTracker";
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
         <Route path="/goals" element={<Goal />} />
         <Route path="/subscriptions" element={<Subscription />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/combinedTracker" element={<CombinedTracker />} />
       </Routes>
     </Router>
   );
