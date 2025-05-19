@@ -35,6 +35,14 @@ ChartJS.register(
 
 const Portfolio = () => {
   const [portfolio, setPortfolio] = useState([]);
+  const [portfolioSummary, setPortfolioSummary] = useState({
+    totalValue: 0,
+    totalProfitLoss: 0,
+    assetCountByType: {},
+  });
+  const [assetAllocation, setAssetAllocation] = useState([]);
+  const [portfolioTrend, setPortfolioTrend] = useState([]);
+  const [assetPerformance, setAssetPerformance] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currency, setCurrency] = useState("USD");
@@ -48,18 +56,83 @@ const Portfolio = () => {
   });
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [recentActions, setRecentActions] = useState([]);
+  const [selectedSymbol, setSelectedSymbol] = useState("");
+  const [selectedType, setSelectedType] = useState("stock");
 
   const isEditing = formData.id !== null;
   const cookies = new Cookies();
   const navigate = useNavigate();
   const API_URL = "http://localhost:8090";
 
+  // Color scheme
+  const colors = {
+    primary: "#6366f1",
+    success: "#22c55e",
+    danger: "#ef4444",
+    warning: "#f59e0b",
+    background: "#f8fafc",
+    cardBackground: "#ffffff",
+    textPrimary: "#1e293b",
+    textSecondary: "#64748b",
+  };
+
+  // Styled components
+  const cardStyle = {
+    background: colors.cardBackground,
+    padding: "1.5rem",
+    borderRadius: "1rem",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06)",
+    transition: "transform 0.2s, box-shadow 0.2s",
+  };
+
+  const buttonStyle = (color) => ({
+    padding: "0.5rem 1rem",
+    background: colors[color],
+    color: "white",
+    borderRadius: "0.375rem",
+    cursor: "pointer",
+    transition: "opacity 0.2s",
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+  });
+
+  // Enhanced chart configurations
+  const commonChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: "top", labels: { color: colors.textPrimary } },
+      tooltip: {
+        backgroundColor: colors.cardBackground,
+        titleColor: colors.textPrimary,
+        bodyColor: colors.textSecondary,
+        borderColor: "#e2e8f0",
+        borderWidth: 1,
+        padding: 12,
+        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+      },
+    },
+    scales: {
+      x: {
+        grid: { color: "#e2e8f0" },
+        ticks: { color: colors.textSecondary },
+      },
+      y: {
+        grid: { color: "#e2e8f0" },
+        ticks: { color: colors.textSecondary },
+      },
+    },
+  };
+
   const getAuthToken = () => cookies.get("token");
 
-  const fetchPortfolio = async () => {
+  // Fetch all portfolio data
+  const fetchPortfolioData = async () => {
     const token = getAuthToken();
     if (!token) {
       alert("You are not authenticated");
@@ -69,105 +142,179 @@ const Portfolio = () => {
 
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/getAssets`, {
+      setError(null);
+
+      const assetsResponse = await axios.get(`${API_URL}/getAssets`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setPortfolio(response.data);
-      setError(null);
+      const validAssets = assetsResponse.data.filter(
+        (asset) =>
+          asset.assetName &&
+          typeof asset.assetName === "string" &&
+          asset.symbol &&
+          typeof asset.symbol === "string"
+      );
+      setPortfolio(validAssets);
+
+      const summaryResponse = await axios.get(`${API_URL}/portfolio/summary`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setPortfolioSummary(summaryResponse.data);
+
+      const allocationResponse = await axios.get(
+        `${API_URL}/portfolio/asset-allocation`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setAssetAllocation(allocationResponse.data);
+
+      const trendResponse = await axios.get(`${API_URL}/trend`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setPortfolioTrend(trendResponse.data);
     } catch (err) {
-      console.error("Error fetching portfolio", err);
-      setError("Failed to fetch portfolio. Please try again.");
+      console.error("Error fetching portfolio data", err);
+      setError("Failed to fetch portfolio data. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
+  // Fetch asset performance
+  const fetchAssetPerformance = async (symbol, type) => {
+    const token = getAuthToken();
+    if (!token) {
+      alert("You are not authenticated");
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const response = await axios.get(`${API_URL}/performance`, {
+        params: { symbol, type },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setAssetPerformance((prev) => ({
+        ...prev,
+        [`${symbol}:${type}`]: response.data,
+      }));
+    } catch (err) {
+      console.error(`Error fetching performance for ${symbol} (${type})`, err);
+      setError(`Failed to fetch performance data for ${symbol}.`);
+    }
+  };
+
   useEffect(() => {
-    fetchPortfolio();
+    fetchPortfolioData();
   }, []);
 
   // Filter and sort logic
-  const filteredAssets = portfolio.filter(asset => {
-    const matchesSearch = asset.assetName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         asset.symbol.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredAssets = portfolio.filter((asset) => {
+    const assetName = asset.assetName || "";
+    const symbol = asset.symbol || "";
+    const matchesSearch =
+      assetName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      symbol.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = filterType === "all" || asset.assetType === filterType;
     return matchesSearch && matchesType;
   });
 
   const sortedAssets = [...filteredAssets].sort((a, b) => {
     if (!sortConfig.key) return 0;
-    
-    const aValue = a[sortConfig.key];
-    const bValue = b[sortConfig.key];
-    
-    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+    const aValue = a[sortConfig.key] || "";
+    const bValue = b[sortConfig.key] || "";
+    if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;
+    if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
     return 0;
   });
 
   const requestSort = (key) => {
-    let direction = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
+    let direction = "asc";
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
     }
     setSortConfig({ key, direction });
   };
 
-  // Portfolio summary calculations
-  const totalValue = portfolio.reduce(
-    (sum, asset) => sum + (asset.currentPrice || 0) * (asset.quantity || 0),
-    0
-  );
-
-  const totalCost = portfolio.reduce(
-    (sum, asset) => sum + (asset.purchasePrice || 0) * (asset.quantity || 0),
-    0
-  );
-
-  const totalProfit = totalValue - totalCost;
-  const profitPercentage = totalCost > 0 ? (totalProfit / totalCost) * 100 : 0;
-
   // Chart data
-  const lineChartData = {
-    labels: portfolio.map((asset) => asset.assetName),
+  const allocationChartData = {
+    labels: assetAllocation.map((alloc) => alloc.assetType),
     datasets: [
       {
-        label: `Value (${currency})`,
-        data: portfolio.map(
-          (asset) => (asset.currentPrice || 0) * (asset.quantity || 0)
+        data: assetAllocation.map((alloc) => alloc.totalValue),
+        backgroundColor: assetAllocation.map(
+          () => `#${Math.floor(Math.random() * 16777215).toString(16)}`
         ),
-        backgroundColor: "rgba(75, 192, 192, 0.2)",
-        borderColor: "#4BC0C0",
-        borderWidth: 2,
-        tension: 0.3,
-        fill: true,
       },
     ],
   };
 
-  const pieChartData = {
-    labels: portfolio.map(asset => asset.assetName),
-    datasets: [{
-      data: portfolio.map(asset => (asset.currentPrice || 0) * (asset.quantity || 0)),
-      backgroundColor: portfolio.map(() => `#${Math.floor(Math.random()*16777215).toString(16)}`),
-    }]
+  const performanceChartData = {
+    labels: portfolio.map((a) => a.assetName || "Unknown"),
+    datasets: [
+      {
+        label: "Performance (%)",
+        data: portfolio.map((a) => {
+          const invested = (a.purchasePrice || 0) * (a.quantity || 0);
+          const current = (a.currentPrice || 0) * (a.quantity || 0);
+          return invested > 0 ? ((current - invested) / invested) * 100 : 0;
+        }),
+        backgroundColor: portfolio.map((a) =>
+          (a.currentPrice || 0) * (a.quantity || 0) >=
+          (a.purchasePrice || 0) * (a.quantity || 0)
+            ? colors.success
+            : colors.danger
+        ),
+        borderColor: colors.cardBackground,
+        borderWidth: 1,
+        borderRadius: 4,
+        barPercentage: 0.7,
+      },
+    ],
   };
 
-  const performanceChartData = {
-    labels: portfolio.map(asset => asset.assetName),
-    datasets: [{
-      label: 'Performance (%)',
-      data: portfolio.map(asset => {
-        const invested = asset.purchasePrice * asset.quantity;
-        const current = asset.currentPrice * asset.quantity;
-        return invested > 0 ? ((current - invested) / invested) * 100 : 0;
-      }),
-      backgroundColor: portfolio.map(asset => {
-        const invested = asset.purchasePrice * asset.quantity;
-        const current = asset.currentPrice * asset.quantity;
-        return current >= invested ? 'rgba(75, 192, 192, 0.6)' : 'rgba(255, 99, 132, 0.6)';
-      }),
-    }]
+  const getTrendChartData = () => {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const gradientFill = ctx.createLinearGradient(0, 0, 0, 400);
+    gradientFill.addColorStop(0, "rgba(99, 102, 241, 0.2)");
+    gradientFill.addColorStop(1, "rgba(99, 102, 241, 0)");
+
+    return {
+      labels: portfolioTrend.map((s) => s.snapshotDate || "Unknown"),
+      datasets: [
+        {
+          label: `Portfolio Value (${currency})`,
+          data: portfolioTrend.map((s) => s.totalValue || 0),
+          borderColor: colors.primary,
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.3,
+          fill: true,
+          backgroundColor: gradientFill,
+        },
+      ],
+    };
+  };
+
+  const assetPerformanceChartData = (symbol, type) => {
+    const performanceData = assetPerformance[`${symbol}:${type}`] || [];
+    return {
+      labels: performanceData.map((data) => data.date || "Unknown"),
+      datasets: [
+        {
+          label: `Price (${currency})`,
+          data: performanceData.map((data) => data.price || 0),
+          borderColor: colors.primary,
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.3,
+          fill: true,
+          backgroundColor: colors.background,
+        },
+      ],
+    };
   };
 
   // Handlers
@@ -183,6 +330,19 @@ const Portfolio = () => {
       return;
     }
 
+    if (!formData.assetName || !formData.symbol) {
+      setError("Asset Name and Symbol are required.");
+      return;
+    }
+    if (!formData.quantity || formData.quantity <= 0) {
+      setError("Quantity must be a positive number.");
+      return;
+    }
+    if (!formData.purchasePrice || formData.purchasePrice <= 0) {
+      setError("Purchase Price must be a positive number.");
+      return;
+    }
+
     try {
       const endpoint = isEditing ? "/updateAsset" : "/addAsset";
       const payload = {
@@ -195,6 +355,15 @@ const Portfolio = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
 
+      setRecentActions((prev) => [
+        {
+          action: isEditing ? "Updated" : "Added",
+          assetName: formData.assetName,
+          timestamp: new Date().toISOString(),
+        },
+        ...prev.slice(0, 4),
+      ]);
+
       setFormData({
         id: null,
         assetName: "",
@@ -203,7 +372,7 @@ const Portfolio = () => {
         purchasePrice: "",
         symbol: "",
       });
-      fetchPortfolio();
+      fetchPortfolioData();
     } catch (err) {
       console.error("Error saving asset", err);
       setError("Failed to save asset. Please check inputs.");
@@ -211,18 +380,18 @@ const Portfolio = () => {
   };
 
   const handleEdit = (asset) => {
-    setFormData({ 
+    setFormData({
       id: asset.id,
-      assetName: asset.assetName,
-      assetType: asset.assetType,
-      quantity: asset.quantity,
-      purchasePrice: asset.purchasePrice,
-      symbol: asset.symbol
+      assetName: asset.assetName || "",
+      assetType: asset.assetType || "stock",
+      quantity: asset.quantity || "",
+      purchasePrice: asset.purchasePrice || "",
+      symbol: asset.symbol || "",
     });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setShowModal(true);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id, assetName) => {
     const token = getAuthToken();
     if (!token) {
       alert("You are not authenticated");
@@ -234,7 +403,11 @@ const Portfolio = () => {
       await axios.get(`${API_URL}/deleteAsset/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      fetchPortfolio();
+      setRecentActions((prev) => [
+        { action: "Deleted", assetName, timestamp: new Date().toISOString() },
+        ...prev.slice(0, 4),
+      ]);
+      fetchPortfolioData();
     } catch (err) {
       console.error("Error deleting asset", err);
       setError("Failed to delete asset.");
@@ -243,29 +416,45 @@ const Portfolio = () => {
 
   const handleExportPDF = () => {
     const doc = new jsPDF();
-    doc.text("My Portfolio Report", 20, 10);
-    doc.text(`Total Value: $${totalValue.toFixed(2)}`, 20, 20);
-    doc.text(`Total Investment: $${totalCost.toFixed(2)}`, 20, 30);
-    doc.text(`Profit/Loss: $${totalProfit.toFixed(2)} (${profitPercentage.toFixed(2)}%)`, 
-             20, 40, { color: totalProfit >= 0 ? 'green' : 'red' });
-    
+    doc.text("Portfolio Report", 20, 10);
+    doc.text(`Total Value: $${portfolioSummary.totalValue.toFixed(2)}`, 20, 20);
+    doc.text(
+      `Total Profit/Loss: $${portfolioSummary.totalProfitLoss.toFixed(2)}`,
+      20,
+      30
+    );
+    doc.text(
+      `Asset Types: ${Object.entries(portfolioSummary.assetCountByType)
+        .map(([type, count]) => `${type}: ${count}`)
+        .join(", ")}`,
+      20,
+      40
+    );
+
     portfolio.forEach((asset, i) => {
-      const yPos = 50 + i * 10;
+      const yPos = 50 + i * 15;
       const assetValue = (asset.currentPrice || 0) * (asset.quantity || 0);
       const assetCost = (asset.purchasePrice || 0) * (asset.quantity || 0);
       const assetProfit = assetValue - assetCost;
-      
+
       doc.text(
-        `${asset.assetName} (${asset.symbol}): ${asset.quantity} @ $${asset.purchasePrice?.toFixed(2)} → $${asset.currentPrice?.toFixed(2)}`,
+        `${asset.assetName || "Unknown"} (${
+          asset.symbol || "N/A"
+        }): ${asset.quantity || 0} @ $${(asset.purchasePrice || 0).toFixed(
+          2
+        )} → $${(asset.currentPrice || 0).toFixed(2)}`,
         10,
         yPos
       );
+      doc.setTextColor(assetProfit >= 0 ? "0, 128, 0" : "255, 0, 0");
       doc.text(
-        `Value: $${assetValue.toFixed(2)} (${assetProfit >= 0 ? '+' : ''}${((assetProfit/assetCost)*100 || 0).toFixed(2)}%)`,
+        `Value: $${assetValue.toFixed(2)} (${
+          assetProfit >= 0 ? "+" : ""
+        }${((assetProfit / assetCost) * 100 || 0).toFixed(2)}%)`,
         10,
-        yPos + 5,
-        { color: assetProfit >= 0 ? 'green' : 'red' }
+        yPos + 5
       );
+      doc.setTextColor(0, 0, 0);
     });
     doc.save("portfolio_report.pdf");
   };
@@ -276,16 +465,32 @@ const Portfolio = () => {
       header: true,
       complete: (results) => {
         results.data.forEach((row) => {
+          if (!row.assetName || !row.symbol) return;
           const payload = {
             ...row,
-            quantity: parseFloat(row.quantity),
-            purchasePrice: parseFloat(row.purchasePrice),
+            quantity: parseFloat(row.quantity) || 0,
+            purchasePrice: parseFloat(row.purchasePrice) || 0,
+            assetType: row.assetType || "stock",
           };
           axios
             .post(`${API_URL}/addAsset`, payload, {
               headers: { Authorization: `Bearer ${getAuthToken()}` },
             })
-            .then(fetchPortfolio);
+            .then(() => {
+              setRecentActions((prev) => [
+                {
+                  action: "Added",
+                  assetName: row.assetName,
+                  timestamp: new Date().toISOString(),
+                },
+                ...prev.slice(0, 4),
+              ]);
+              fetchPortfolioData();
+            })
+            .catch((err) => {
+              console.error("Error importing asset", err);
+              setError("Failed to import asset from CSV.");
+            });
         });
       },
     });
@@ -296,51 +501,243 @@ const Portfolio = () => {
   };
 
   const refreshPrices = () => {
-    fetchPortfolio();
+    fetchPortfolioData();
   };
 
   const alertAssets = portfolio.filter(
-    (asset) => asset.currentPrice < 0.8 * asset.purchasePrice
+    (asset) => (asset.currentPrice || 0) < 0.8 * (asset.purchasePrice || 0)
   );
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <h2 className="text-3xl font-bold mb-6 text-blue-800">My Investment Portfolio</h2>
+    <div
+      style={{
+        padding: "2rem",
+        maxWidth: "1440px",
+        margin: "0 auto",
+        background: colors.background,
+        minHeight: "100vh",
+      }}
+    >
+      {/* Header Section */}
+      <div style={{ marginBottom: "2rem" }}>
+        <h1
+          style={{
+            fontSize: "1.875rem",
+            fontWeight: 700,
+            color: colors.textPrimary,
+            display: "flex",
+            alignItems: "center",
+            gap: "1rem",
+          }}
+        >
+          📈 Investment Portfolio
+          <span
+            style={{
+              fontSize: "1rem",
+              background: colors.primary,
+              color: "white",
+              padding: "0.25rem 0.75rem",
+              borderRadius: "999px",
+            }}
+          >
+            {portfolio.length} Assets
+          </span>
+        </h1>
+      </div>
 
-      {/* Portfolio Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white p-4 rounded-lg shadow border border-blue-100">
-          <h3 className="text-gray-500 text-sm font-medium">Total Value</h3>
-          <p className="text-2xl font-bold">${totalValue.toFixed(2)}</p>
+      {/* Summary Cards */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+          gap: "1.5rem",
+          marginBottom: "2rem",
+        }}
+      >
+        <div style={cardStyle}>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <div>
+              <div
+                style={{ color: colors.textSecondary, marginBottom: "0.5rem" }}
+              >
+                Total Value
+              </div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>
+                ${portfolioSummary.totalValue.toLocaleString(undefined, {
+                  maximumFractionDigits: 2,
+                })}
+              </div>
+            </div>
+            <div
+              style={{
+                width: "3rem",
+                height: "3rem",
+                background: "#e0e7ff",
+                borderRadius: "0.5rem",
+                display: "grid",
+                placeItems: "center",
+              }}
+            >
+              💰
+            </div>
+          </div>
+          <div
+            style={{
+              marginTop: "1rem",
+              color:
+                portfolioSummary.totalProfitLoss >= 0
+                  ? colors.success
+                  : colors.danger,
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+            }}
+          >
+            {portfolioSummary.totalProfitLoss >= 0 ? "↑" : "↓"}
+            {Math.abs(portfolioSummary.totalProfitLoss).toFixed(2)} (
+            {portfolioSummary.totalValue > 0
+              ? (
+                  (portfolioSummary.totalProfitLoss /
+                    portfolioSummary.totalValue) *
+                  100
+                ).toFixed(2)
+              : 0}
+            %)
+          </div>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow border border-blue-100">
-          <h3 className="text-gray-500 text-sm font-medium">Total Invested</h3>
-          <p className="text-2xl font-bold">${totalCost.toFixed(2)}</p>
+        <div style={cardStyle}>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <div>
+              <div
+                style={{ color: colors.textSecondary, marginBottom: "0.5rem" }}
+              >
+                Total Profit/Loss
+              </div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>
+                $
+                {Math.abs(portfolioSummary.totalProfitLoss).toLocaleString(
+                  undefined,
+                  { maximumFractionDigits: 2 }
+                )}
+              </div>
+            </div>
+            <div
+              style={{
+                width: "3rem",
+                height: "3rem",
+                background: "#e0e7ff",
+                borderRadius: "0.5rem",
+                display: "grid",
+                placeItems: "center",
+              }}
+            >
+              📊
+            </div>
+          </div>
+          <div
+            style={{
+              marginTop: "1rem",
+              color:
+                portfolioSummary.totalProfitLoss >= 0
+                  ? colors.success
+                  : colors.danger,
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+            }}
+          >
+            {portfolioSummary.totalProfitLoss >= 0 ? "↑" : "↓"}
+            {portfolioSummary.totalValue > 0
+              ? (
+                  (portfolioSummary.totalProfitLoss /
+                    portfolioSummary.totalValue) *
+                  100
+                ).toFixed(2)
+              : 0}
+            %
+          </div>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow border border-blue-100">
-          <h3 className="text-gray-500 text-sm font-medium">Profit/Loss</h3>
-          <p className={`text-2xl font-bold ${totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            ${Math.abs(totalProfit).toFixed(2)} ({profitPercentage.toFixed(2)}%)
-          </p>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow border border-blue-100">
-          <h3 className="text-gray-500 text-sm font-medium">Assets</h3>
-          <p className="text-2xl font-bold">{portfolio.length}</p>
+        <div style={cardStyle}>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <div>
+              <div
+                style={{ color: colors.textSecondary, marginBottom: "0.5rem" }}
+              >
+                Asset Types
+              </div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>
+                {Object.values(portfolioSummary.assetCountByType).reduce(
+                  (sum, count) => sum + count,
+                  0
+                )}
+              </div>
+            </div>
+            <div
+              style={{
+                width: "3rem",
+                height: "3rem",
+                background: "#e0e7ff",
+                borderRadius: "0.5rem",
+                display: "grid",
+                placeItems: "center",
+              }}
+            >
+              🗂
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="flex flex-wrap justify-between gap-4 mb-6">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="Search assets..."
-            className="p-2 border rounded"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      {/* Controls Section */}
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "1rem",
+          marginBottom: "2rem",
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            gap: "1rem",
+            minWidth: "300px",
+          }}
+        >
+          <div style={{ flex: 1, position: "relative" }}>
+            <input
+              type="text"
+              placeholder="Search assets..."
+              style={{
+                width: "100%",
+                padding: "0.75rem 2.5rem",
+                borderRadius: "0.75rem",
+                border: `1px solid #e2e8f0`,
+                background: colors.cardBackground,
+              }}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <span
+              style={{
+                position: "absolute",
+                left: "1rem",
+                top: "50%",
+                transform: "translateY(-50%)",
+                opacity: 0.5,
+              }}
+            >
+              🔍
+            </span>
+          </div>
           <select
-            className="p-2 border rounded"
+            style={{
+              padding: "0.75rem",
+              borderRadius: "0.75rem",
+              border: `1px solid #e2e8f0`,
+              background: colors.cardBackground,
+            }}
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
           >
@@ -350,93 +747,176 @@ const Portfolio = () => {
           </select>
           <button
             onClick={refreshPrices}
-            className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+            style={buttonStyle("primary")}
             title="Refresh prices"
           >
-            🔄
+            🔄 Refresh
           </button>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={toggleCurrency}
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-          >
-            Toggle Currency ({currency})
+        <div style={{ display: "flex", gap: "1rem" }}>
+          <button onClick={toggleCurrency} style={buttonStyle("success")}>
+            💱 {currency}
           </button>
           <input
             type="file"
             accept=".csv"
             onChange={handleCSVUpload}
-            className="hidden"
+            style={{ display: "none" }}
             id="csvUpload"
           />
-          <label
-            htmlFor="csvUpload"
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer"
-          >
-            Import CSV
+          <label htmlFor="csvUpload" style={buttonStyle("primary")}>
+            📤 Import CSV
           </label>
-          <button
-            onClick={handleExportPDF}
-            className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-          >
-            Export PDF
+          <button onClick={handleExportPDF} style={buttonStyle("danger")}>
+            📥 Export PDF
           </button>
         </div>
       </div>
 
       {/* Alerts */}
       {alertAssets.length > 0 && (
-        <div className="p-3 mb-4 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded">
-          <h3 className="font-bold mb-2">⚠️ Price Alerts</h3>
-          {alertAssets.map(asset => (
-            <p key={asset.id}>
-              {asset.assetName} has dropped {(100 - (asset.currentPrice / asset.purchasePrice * 100)).toFixed(2)}% from purchase price
+        <div
+          style={{
+            ...cardStyle,
+            padding: "1rem",
+            marginBottom: "2rem",
+            border: `1px solid ${colors.warning}`,
+            background: "#fefce8",
+          }}
+        >
+          <h3
+            style={{
+              fontWeight: "bold",
+              marginBottom: "0.5rem",
+              color: colors.textPrimary,
+            }}
+          >
+            ⚠️ Price Alerts
+          </h3>
+          {alertAssets.map((asset) => (
+            <p key={asset.id} style={{ color: colors.textSecondary }}>
+              {asset.assetName || "Unknown"} has dropped{" "}
+              {(
+                100 -
+                ((asset.currentPrice || 0) / (asset.purchasePrice || 1)) * 100
+              ).toFixed(2)}
+              % from purchase price
             </p>
           ))}
         </div>
       )}
 
       {/* Add/Edit Form */}
-      <div className="mb-6 p-4 border rounded bg-gray-50 shadow">
-        <h3 className="text-xl font-semibold mb-2">
+      <div style={{ ...cardStyle, marginBottom: "2rem" }}>
+        <h3
+          style={{
+            fontSize: "1.125rem",
+            fontWeight: 600,
+            marginBottom: "1rem",
+            color: colors.textPrimary,
+          }}
+        >
           {isEditing ? "Edit Asset" : "Add New Asset"}
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: "1rem",
+          }}
+        >
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Asset Name</label>
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.875rem",
+                fontWeight: "medium",
+                color: colors.textPrimary,
+                marginBottom: "0.25rem",
+              }}
+            >
+              Asset Name
+            </label>
             <input
               name="assetName"
               value={formData.assetName}
               onChange={handleInputChange}
               placeholder="e.g., Apple Inc."
-              className="w-full p-2 border rounded"
+              style={{
+                width: "100%",
+                padding: "0.75rem",
+                borderRadius: "0.75rem",
+                border: `1px solid #e2e8f0`,
+                background: colors.cardBackground,
+              }}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Symbol</label>
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.875rem",
+                fontWeight: "medium",
+                color: colors.textPrimary,
+                marginBottom: "0.25rem",
+              }}
+            >
+              Symbol
+            </label>
             <input
               name="symbol"
               value={formData.symbol}
               onChange={handleInputChange}
               placeholder="e.g., AAPL"
-              className="w-full p-2 border rounded"
+              style={{
+                width: "100%",
+                padding: "0.75rem",
+                borderRadius: "0.75rem",
+                border: `1px solid #e2e8f0`,
+                background: colors.cardBackground,
+              }}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Asset Type</label>
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.875rem",
+                fontWeight: "medium",
+                color: colors.textPrimary,
+                marginBottom: "0.25rem",
+              }}
+            >
+              Asset Type
+            </label>
             <select
               name="assetType"
               value={formData.assetType}
               onChange={handleInputChange}
-              className="w-full p-2 border rounded"
+              style={{
+                width: "100%",
+                padding: "0.75rem",
+                borderRadius: "0.75rem",
+                border: `1px solid #e2e8f0`,
+                background: colors.cardBackground,
+              }}
             >
               <option value="stock">Stock</option>
               <option value="crypto">Crypto</option>
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.875rem",
+                fontWeight: "medium",
+                color: colors.textPrimary,
+                marginBottom: "0.25rem",
+              }}
+            >
+              Quantity
+            </label>
             <input
               name="quantity"
               value={formData.quantity}
@@ -444,11 +924,27 @@ const Portfolio = () => {
               placeholder="e.g., 10"
               type="number"
               step="any"
-              className="w-full p-2 border rounded"
+              style={{
+                width: "100%",
+                padding: "0.75rem",
+                borderRadius: "0.75rem",
+                border: `1px solid #e2e8f0`,
+                background: colors.cardBackground,
+              }}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Price</label>
+            <label
+              style={{
+                display: "block",
+                fontSize: "0.875rem",
+                fontWeight: "medium",
+                color: colors.textPrimary,
+                marginBottom: "0.25rem",
+              }}
+            >
+              Purchase Price
+            </label>
             <input
               name="purchasePrice"
               value={formData.purchasePrice}
@@ -456,27 +952,38 @@ const Portfolio = () => {
               placeholder="e.g., 150.50"
               type="number"
               step="any"
-              className="w-full p-2 border rounded"
+              style={{
+                width: "100%",
+                padding: "0.75rem",
+                borderRadius: "0.75rem",
+                border: `1px solid #e2e8f0`,
+                background: colors.cardBackground,
+              }}
             />
           </div>
-          <div className="flex items-end">
-            <button
-              onClick={handleAddOrUpdate}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-end",
+              gap: "0.5rem",
+            }}
+          >
+            <button onClick={handleAddOrUpdate} style={buttonStyle("primary")}>
               {isEditing ? "Update Asset" : "Add Asset"}
             </button>
             {isEditing && (
               <button
-                onClick={() => setFormData({
-                  id: null,
-                  assetName: "",
-                  assetType: "stock",
-                  quantity: "",
-                  purchasePrice: "",
-                  symbol: "",
-                })}
-                className="ml-2 px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                onClick={() =>
+                  setFormData({
+                    id: null,
+                    assetName: "",
+                    assetType: "stock",
+                    quantity: "",
+                    purchasePrice: "",
+                    symbol: "",
+                  })
+                }
+                style={buttonStyle("danger")}
               >
                 Cancel
               </button>
@@ -486,145 +993,443 @@ const Portfolio = () => {
       </div>
 
       {error && (
-        <div className="p-3 mb-4 bg-red-100 border border-red-400 text-red-700 rounded">
+        <div
+          style={{
+            ...cardStyle,
+            padding: "1rem",
+            marginBottom: "2rem",
+            border: `1px solid ${colors.danger}`,
+            background: "#fee2e2",
+          }}
+        >
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="text-center py-8">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-          <p className="mt-2">Loading portfolio data...</p>
+        <div style={{ textAlign: "center", padding: "2rem" }}>
+          <div
+            style={{
+              display: "inline-block",
+              animation: "spin 1s linear infinite",
+              borderRadius: "50%",
+              width: "2rem",
+              height: "2rem",
+              border: `4px solid ${colors.primary}`,
+              borderTopColor: "transparent",
+            }}
+          ></div>
+          <p
+            style={{ marginTop: "0.5rem", color: colors.textSecondary }}
+          >
+            Loading portfolio data...
+          </p>
         </div>
       ) : (
         <>
           {/* Charts Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <div className="bg-white p-4 rounded-lg shadow">
-              <h3 className="text-lg font-semibold mb-2">Portfolio Allocation</h3>
-              <div className="h-64">
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+              gap: "1.5rem",
+              marginBottom: "2rem",
+            }}
+          >
+            <div style={cardStyle}>
+              <h3
+                style={{
+                  fontSize: "1.125rem",
+                  fontWeight: 600,
+                  marginBottom: "1rem",
+                  color: colors.textPrimary,
+                }}
+              >
+                Asset Allocation
+              </h3>
+              <div style={{ height: "300px" }}>
                 <Pie
-                  data={pieChartData}
+                  data={allocationChartData}
                   options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
+                    ...commonChartOptions,
                     plugins: {
-                      legend: {
-                        position: 'right',
+                      ...commonChartOptions.plugins,
+                      tooltip: {
+                        ...commonChartOptions.plugins.tooltip,
+                        callbacks: {
+                          label: (context) => {
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce(
+                              (a, b) => a + b,
+                              0
+                            );
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return `${context.label}: $${value.toFixed(
+                              2
+                            )} (${percentage}%)`;
+                          },
+                        },
                       },
                     },
                   }}
                 />
               </div>
             </div>
-            <div className="bg-white p-4 rounded-lg shadow">
-              <h3 className="text-lg font-semibold mb-2">Asset Performance</h3>
-              <div className="h-64">
+            <div style={cardStyle}>
+              <h3
+                style={{
+                  fontSize: "1.125rem",
+                  fontWeight: 600,
+                  marginBottom: "1rem",
+                  color: colors.textPrimary,
+                }}
+              >
+                Portfolio Performance
+              </h3>
+              <div style={{ height: "300px" }}>
                 <Bar
                   data={performanceChartData}
                   options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                      y: {
-                        beginAtZero: true,
-                      },
-                    },
+                    ...commonChartOptions,
+                    scales: { y: { beginAtZero: true } },
+                  }}
+                />
+              </div>
+            </div>
+            <div style={cardStyle}>
+              <h3
+                style={{
+                  fontSize: "1.125rem",
+                  fontWeight: 600,
+                  marginBottom: "1rem",
+                  color: colors.textPrimary,
+                }}
+              >
+                Portfolio Trend
+              </h3>
+              <div style={{ height: "300px" }}>
+                <Line
+                  data={getTrendChartData()}
+                  options={{
+                    ...commonChartOptions,
+                    scales: { y: { beginAtZero: false } },
                   }}
                 />
               </div>
             </div>
           </div>
 
+          {/* Asset Performance Selector */}
+          <div style={{ ...cardStyle, marginBottom: "2rem" }}>
+            <h3
+              style={{
+                fontSize: "1.125rem",
+                fontWeight: 600,
+                marginBottom: "1rem",
+                color: colors.textPrimary,
+              }}
+            >
+              Asset Price History
+            </h3>
+            <div
+              style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}
+            >
+              <select
+                value={selectedSymbol}
+                onChange={(e) => {
+                  setSelectedSymbol(e.target.value);
+                  if (e.target.value)
+                    fetchAssetPerformance(e.target.value, selectedType);
+                }}
+                style={{
+                  padding: "0.75rem",
+                  borderRadius: "0.75rem",
+                  border: `1px solid #e2e8f0`,
+                  background: colors.cardBackground,
+                  flex: 1,
+                }}
+              >
+                <option value="">Select Asset</option>
+                {portfolio.map((asset) => (
+                  <option key={asset.id} value={asset.symbol}>
+                    {asset.assetName || "Unknown"} ({asset.symbol || "N/A"})
+                  </option>
+                ))}
+              </select>
+              <select
+                value={selectedType}
+                onChange={(e) => {
+                  setSelectedType(e.target.value);
+                  if (selectedSymbol)
+                    fetchAssetPerformance(selectedSymbol, e.target.value);
+                }}
+                style={{
+                  padding: "0.75rem",
+                  borderRadius: "0.75rem",
+                  border: `1px solid #e2e8f0`,
+                  background: colors.cardBackground,
+                }}
+              >
+                <option value="stock">Stock</option>
+                <option value="crypto">Crypto</option>
+              </select>
+            </div>
+            {selectedSymbol &&
+              assetPerformance[`${selectedSymbol}:${selectedType}`] && (
+                <div style={cardStyle}>
+                  <h3
+                    style={{
+                      fontSize: "1.125rem",
+                      fontWeight: 600,
+                      marginBottom: "1rem",
+                      color: colors.textPrimary,
+                    }}
+                  >
+                    Price History: {selectedSymbol}
+                  </h3>
+                  <div style={{ height: "300px" }}>
+                    <Line
+                      data={assetPerformanceChartData(
+                        selectedSymbol,
+                        selectedType
+                      )}
+                      options={{
+                        ...commonChartOptions,
+                        scales: { y: { beginAtZero: false } },
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+          </div>
+
+          {/* Recent Actions */}
+          <div style={{ ...cardStyle, marginBottom: "2rem" }}>
+            <h3
+              style={{
+                fontSize: "1.125rem",
+                fontWeight: 600,
+                marginBottom: "1rem",
+                color: colors.textPrimary,
+              }}
+            >
+              Recent Actions
+            </h3>
+            {recentActions.length > 0 ? (
+              <ul style={{ listStyle: "none", padding: 0 }}>
+                {recentActions.map((action, index) => (
+                  <li
+                    key={index}
+                    style={{
+                      padding: "0.5rem 0",
+                      borderBottom: "1px solid #e2e8f0",
+                      color: colors.textSecondary,
+                    }}
+                  >
+                    {action.action} {action.assetName} at{" "}
+                    {new Date(action.timestamp).toLocaleString()}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p style={{ color: colors.textSecondary }}>
+                No recent actions.
+              </p>
+            )}
+          </div>
+
           {/* Assets Table */}
-          <div className="mb-6 overflow-x-auto bg-white rounded-lg shadow">
-            <table className="w-full">
-              <thead className="bg-blue-50">
+          <div style={cardStyle}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1rem",
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: "1.125rem",
+                  fontWeight: 600,
+                  color: colors.textPrimary,
+                }}
+              >
+                Asset Details
+              </h3>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <button
+                  onClick={handleExportPDF}
+                  style={buttonStyle("primary")}
+                >
+                  📥 Export PDF
+                </button>
+                <button
+                  onClick={() => setShowModal(true)}
+                  style={buttonStyle("success")}
+                >
+                  ➕ Add Asset
+                </button>
+              </div>
+            </div>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead style={{ background: "#f1f5f9" }}>
                 <tr>
-                  <th 
-                    className="p-3 text-left cursor-pointer hover:bg-blue-100"
-                    onClick={() => requestSort('assetName')}
-                  >
-                    Asset Name {sortConfig.key === 'assetName' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th 
-                    className="p-3 text-left cursor-pointer hover:bg-blue-100"
-                    onClick={() => requestSort('assetType')}
-                  >
-                    Type {sortConfig.key === 'assetType' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th 
-                    className="p-3 text-left cursor-pointer hover:bg-blue-100"
-                    onClick={() => requestSort('quantity')}
-                  >
-                    Qty {sortConfig.key === 'quantity' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th className="p-3 text-left">Avg Cost</th>
-                  <th className="p-3 text-left">Current Price</th>
-                  <th className="p-3 text-left">Value</th>
-                  <th className="p-3 text-left">P/L</th>
-                  <th className="p-3 text-left">Actions</th>
+                  {[
+                    { label: "Asset", key: "assetName" },
+                    { label: "Type", key: "assetType" },
+                    { label: "Quantity", key: "quantity" },
+                    { label: "Cost" },
+                    { label: "Current Price" },
+                    { label: "Value" },
+                    { label: "Profit/Loss" },
+                    { label: "" },
+                  ].map((header) => (
+                    <th
+                      key={header.label}
+                      style={{
+                        padding: "1rem",
+                        textAlign: "left",
+                        fontWeight: 500,
+                        color: colors.textSecondary,
+                        fontSize: "0.875rem",
+                        cursor: header.key ? "pointer" : "default",
+                      }}
+                      onClick={
+                        header.key ? () => requestSort(header.key) : undefined
+                      }
+                    >
+                      {header.label}{" "}
+                      {sortConfig.key === header.key &&
+                        (sortConfig.direction === "asc" ? "↑" : "↓")}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {sortedAssets.length > 0 ? (
                   sortedAssets.map((asset) => {
-                    const invested = asset.purchasePrice * asset.quantity;
-                    const current = asset.currentPrice * asset.quantity;
+                    const invested =
+                      (asset.purchasePrice || 0) * (asset.quantity || 0);
+                    const current =
+                      (asset.currentPrice || 0) * (asset.quantity || 0);
                     const profit = current - invested;
                     const profitPercent = invested > 0 ? (profit / invested) * 100 : 0;
 
                     return (
                       <tr
                         key={asset.id}
-                        className="border-t hover:bg-blue-50 cursor-pointer"
+                        style={{
+                          borderTop: "1px solid #f1f5f9",
+                          transition: "background 0.2s",
+                        }}
                         onClick={() => {
                           setSelectedAsset(asset);
                           setShowModal(true);
                         }}
                       >
-                        <td className="p-3">
-                          <div className="font-medium">{asset.assetName}</div>
-                          <div className="text-sm text-gray-500">{asset.symbol}</div>
+                        <td style={{ padding: "1rem" }}>
+                          <div style={{ fontWeight: 500 }}>
+                            {asset.assetName || "Unknown"}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "0.875rem",
+                              color: colors.textSecondary,
+                            }}
+                          >
+                            {asset.symbol || "N/A"}
+                          </div>
                         </td>
-                        <td className="p-3 capitalize">{asset.assetType}</td>
-                        <td className="p-3">{asset.quantity}</td>
-                        <td className="p-3">${asset.purchasePrice?.toFixed(2)}</td>
-                        <td className="p-3 font-medium">
-                          ${asset.currentPrice?.toFixed(2)}
+                        <td
+                          style={{
+                            padding: "1rem",
+                            textTransform: "capitalize",
+                          }}
+                        >
+                          {asset.assetType || "Unknown"}
                         </td>
-                        <td className="p-3 font-semibold">
+                        <td style={{ padding: "1rem" }}>
+                          {asset.quantity || 0}
+                        </td>
+                        <td style={{ padding: "1rem" }}>
+                          ${(asset.purchasePrice || 0).toFixed(2)}
+                        </td>
+                        <td
+                          style={{
+                            padding: "1rem",
+                            fontWeight: "medium",
+                          }}
+                        >
+                          ${(asset.currentPrice || 0).toFixed(2)}
+                        </td>
+                        <td
+                          style={{
+                            padding: "1rem",
+                            fontWeight: "600",
+                          }}
+                        >
                           ${current.toFixed(2)}
                         </td>
-                        <td className={`p-3 ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {profit >= 0 ? '+' : ''}{profit.toFixed(2)} ({profitPercent.toFixed(2)}%)
+                        <td
+                          style={{
+                            padding: "1rem",
+                            color: profit >= 0 ? colors.success : colors.danger,
+                          }}
+                        >
+                          {profit >= 0 ? "+" : ""}${profit.toFixed(2)} (
+                          {profitPercent.toFixed(2)}%)
                         </td>
-                        <td className="p-3 space-x-2">
-                          <button
-                            className="text-blue-600 hover:underline"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEdit(asset);
+                        <td style={{ padding: "1rem" }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: "0.5rem",
+                              justifyContent: "flex-end",
                             }}
                           >
-                            Edit
-                          </button>
-                          <button
-                            className="text-red-600 hover:underline"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(asset.id);
-                            }}
-                          >
-                            Delete
-                          </button>
+                            <button
+                              style={{
+                                padding: "0.5rem",
+                                borderRadius: "0.375rem",
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEdit(asset);
+                              }}
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              style={{
+                                padding: "0.5rem",
+                                borderRadius: "0.375rem",
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(
+                                  asset.id,
+                                  asset.assetName || "Unknown"
+                                );
+                              }}
+                            >
+                              🗑️
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
                   })
                 ) : (
                   <tr>
-                    <td colSpan="8" className="p-4 text-center text-gray-500">
+                    <td
+                      colSpan="8"
+                      style={{
+                        padding: "1rem",
+                        textAlign: "center",
+                        color: colors.textSecondary,
+                      }}
+                    >
                       No assets found. Add some investments to get started!
                     </td>
                   </tr>
@@ -633,82 +1438,436 @@ const Portfolio = () => {
             </table>
           </div>
 
-          {/* Asset Detail Modal */}
-          {showModal && selectedAsset && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="p-6">
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-2xl font-bold">
-                      {selectedAsset.assetName} ({selectedAsset.symbol})
+          {/* Modal */}
+          {showModal && (
+            <div
+              style={{
+                position: "fixed",
+                inset: 0,
+                background: "rgba(0,0,0,0.4)",
+                display: "grid",
+                placeItems: "center",
+                backdropFilter: "blur(4px)",
+                zIndex: 50,
+              }}
+            >
+              <div
+                style={{
+                  background: colors.cardBackground,
+                  borderRadius: "1.5rem",
+                  width: "90%",
+                  maxWidth: "600px",
+                  padding: "2rem",
+                  position: "relative",
+                  animation: "slideIn 0.3s ease-out",
+                }}
+              >
+                {selectedAsset ? (
+                  <>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        marginBottom: "1rem",
+                      }}
+                    >
+                      <h3
+                        style={{
+                          fontSize: "1.5rem",
+                          fontWeight: "bold",
+                          color: colors.textPrimary,
+                        }}
+                      >
+                        {selectedAsset.assetName || "Unknown"} (
+                        {selectedAsset.symbol || "N/A"})
+                      </h3>
+                      <button
+                        onClick={() => setShowModal(false)}
+                        style={{ color: colors.textSecondary }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: "1.5rem",
+                        marginBottom: "1.5rem",
+                      }}
+                    >
+                      <div>
+                        <h4
+                          style={{
+                            fontWeight: "600",
+                            marginBottom: "0.5rem",
+                            color: colors.textPrimary,
+                          }}
+                        >
+                          Investment Details
+                        </h4>
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "0.5rem",
+                          }}
+                        >
+                          <p>
+                            <span style={{ color: colors.textSecondary }}>
+                              Type:
+                            </span>{" "}
+                            {selectedAsset.assetType || "Unknown"}
+                          </p>
+                          <p>
+                            <span style={{ color: colors.textSecondary }}>
+                              Quantity:
+                            </span>{" "}
+                            {selectedAsset.quantity || 0}
+                          </p>
+                          <p>
+                            <span style={{ color: colors.textSecondary }}>
+                              Avg Purchase Price:
+                            </span>{" "}
+                            ${(selectedAsset.purchasePrice || 0).toFixed(2)}
+                          </p>
+                          <p>
+                            <span style={{ color: colors.textSecondary }}>
+                              Current Price:
+                            </span>{" "}
+                            ${(selectedAsset.currentPrice || 0).toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                      <div>
+                        <h4
+                          style={{
+                            fontWeight: "600",
+                            marginBottom: "0.5rem",
+                            color: colors.textPrimary,
+                          }}
+                        >
+                          Performance
+                        </h4>
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "0.5rem",
+                          }}
+                        >
+                          <p>
+                            <span style={{ color: colors.textSecondary }}>
+                              Invested:
+                            </span>{" "}
+                            $
+                            {(
+                              (selectedAsset.purchasePrice || 0) *
+                              (selectedAsset.quantity || 0)
+                            ).toFixed(2)}
+                          </p>
+                          <p>
+                            <span style={{ color: colors.textSecondary }}>
+                              Current Value:
+                            </span>{" "}
+                            $
+                            {(
+                              (selectedAsset.currentPrice || 0) *
+                              (selectedAsset.quantity || 0)
+                            ).toFixed(2)}
+                          </p>
+                          <p>
+                            <span style={{ color: colors.textSecondary }}>
+                              Profit/Loss:
+                            </span>
+                            <span
+                              style={{
+                                color:
+                                  (selectedAsset.currentPrice || 0) *
+                                    (selectedAsset.quantity || 0) -
+                                    (selectedAsset.purchasePrice || 0) *
+                                    (selectedAsset.quantity || 0) >=
+                                  0
+                                    ? colors.success
+                                    : colors.danger,
+                              }}
+                            >
+                              $
+                              {Math.abs(
+                                (selectedAsset.currentPrice || 0) *
+                                  (selectedAsset.quantity || 0) -
+                                  (selectedAsset.purchasePrice || 0) *
+                                  (selectedAsset.quantity || 0)
+                              ).toFixed(2)}{" "}
+                              (
+                              {(selectedAsset.purchasePrice || 0) > 0
+                                ? (
+                                    ((selectedAsset.currentPrice || 0) -
+                                      (selectedAsset.purchasePrice || 0)) /
+                                    (selectedAsset.purchasePrice || 1) *
+                                    100
+                                  ).toFixed(2)
+                                : "0.00"}
+                              %)
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        gap: "0.5rem",
+                      }}
+                    >
+                      <button
+                        onClick={() => {
+                          handleEdit(selectedAsset);
+                          setShowModal(false);
+                        }}
+                        style={buttonStyle("primary")}
+                      >
+                        Edit Asset
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleDelete(
+                            selectedAsset.id,
+                            selectedAsset.assetName || "Unknown"
+                          );
+                          setShowModal(false);
+                        }}
+                        style={buttonStyle("danger")}
+                      >
+                        Delete Asset
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h3
+                      style={{
+                        fontSize: "1.5rem",
+                        fontWeight: "bold",
+                        marginBottom: "1rem",
+                        color: colors.textPrimary,
+                      }}
+                    >
+                      {isEditing ? "Edit Asset" : "Add New Asset"}
                     </h3>
-                    <button
-                      onClick={() => setShowModal(false)}
-                      className="text-gray-500 hover:text-gray-700"
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: "1rem",
+                        marginBottom: "1rem",
+                      }}
                     >
-                      ✕
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div>
-                      <h4 className="font-semibold mb-2">Investment Details</h4>
-                      <div className="space-y-2">
-                        <p><span className="text-gray-600">Type:</span> {selectedAsset.assetType}</p>
-                        <p><span className="text-gray-600">Quantity:</span> {selectedAsset.quantity}</p>
-                        <p><span className="text-gray-600">Avg Purchase Price:</span> ${selectedAsset.purchasePrice?.toFixed(2)}</p>
-                        <p><span className="text-gray-600">Current Price:</span> ${selectedAsset.currentPrice?.toFixed(2)}</p>
+                      <div>
+                        <label
+                          style={{
+                            display: "block",
+                            fontSize: "0.875rem",
+                            fontWeight: "medium",
+                            color: colors.textPrimary,
+                            marginBottom: "0.25rem",
+                          }}
+                        >
+                          Asset Name
+                        </label>
+                        <input
+                          name="assetName"
+                          value={formData.assetName}
+                          onChange={handleInputChange}
+                          placeholder="e.g., Apple Inc."
+                          style={{
+                            width: "100%",
+                            padding: "0.75rem",
+                            borderRadius: "0.75rem",
+                            border: `1px solid #e2e8f0`,
+                            background: colors.cardBackground,
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label
+                          style={{
+                            display: "block",
+                            fontSize: "0.875rem",
+                            fontWeight: "medium",
+                            color: colors.textPrimary,
+                            marginBottom: "0.25rem",
+                          }}
+                        >
+                          Symbol
+                        </label>
+                        <input
+                          name="symbol"
+                          value={formData.symbol}
+                          onChange={handleInputChange}
+                          placeholder="e.g., AAPL"
+                          style={{
+                            width: "100%",
+                            padding: "0.75rem",
+                            borderRadius: "0.75rem",
+                            border: `1px solid #e2e8f0`,
+                            background: colors.cardBackground,
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label
+                          style={{
+                            display: "block",
+                            fontSize: "0.875rem",
+                            fontWeight: "medium",
+                            color: colors.textPrimary,
+                            marginBottom: "0.25rem",
+                          }}
+                        >
+                          Asset Type
+                        </label>
+                        <select
+                          name="assetType"
+                          value={formData.assetType}
+                          onChange={handleInputChange}
+                          style={{
+                            width: "100%",
+                            padding: "0.75rem",
+                            borderRadius: "0.75rem",
+                            border: `1px solid #e2e8f0`,
+                            background: colors.cardBackground,
+                          }}
+                        >
+                          <option value="stock">Stock</option>
+                          <option value="crypto">Crypto</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label
+                          style={{
+                            display: "block",
+                            fontSize: "0.875rem",
+                            fontWeight: "medium",
+                            color: colors.textPrimary,
+                            marginBottom: "0.25rem",
+                          }}
+                        >
+                          Quantity
+                        </label>
+                        <input
+                          name="quantity"
+                          value={formData.quantity}
+                          onChange={handleInputChange}
+                          placeholder="e.g., 10"
+                          type="number"
+                          step="any"
+                          style={{
+                            width: "100%",
+                            padding: "0.75rem",
+                            borderRadius: "0.75rem",
+                            border: `1px solid #e2e8f0`,
+                            background: colors.cardBackground,
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label
+                          style={{
+                            display: "block",
+                            fontSize: "0.875rem",
+                            fontWeight: "medium",
+                            color: colors.textPrimary,
+                            marginBottom: "0.25rem",
+                          }}
+                        >
+                          Purchase Price
+                        </label>
+                        <input
+                          name="purchasePrice"
+                          value={formData.purchasePrice}
+                          onChange={handleInputChange}
+                          placeholder="e.g., 150.50"
+                          type="number"
+                          step="any"
+                          style={{
+                            width: "100%",
+                            padding: "0.75rem",
+                            borderRadius: "0.75rem",
+                            border: `1px solid #e2e8f0`,
+                            background: colors.cardBackground,
+                          }}
+                        />
                       </div>
                     </div>
-
-                    <div>
-                      <h4 className="font-semibold mb-2">Performance</h4>
-                      <div className="space-y-2">
-                        <p>
-                          <span className="text-gray-600">Invested:</span> $
-                          {(selectedAsset.purchasePrice * selectedAsset.quantity).toFixed(2)}
-                        </p>
-                        <p>
-                          <span className="text-gray-600">Current Value:</span> $
-                          {(selectedAsset.currentPrice * selectedAsset.quantity).toFixed(2)}
-                        </p>
-                        <p>
-                          <span className="text-gray-600">Profit/Loss:</span>
-                          <span className={(selectedAsset.currentPrice * selectedAsset.quantity - selectedAsset.purchasePrice * selectedAsset.quantity) >= 0 ? 'text-green-600' : 'text-red-600'}>
-                            ${Math.abs((selectedAsset.currentPrice * selectedAsset.quantity - selectedAsset.purchasePrice * selectedAsset.quantity)).toFixed(2)} (
-                            {selectedAsset.purchasePrice > 0 ? 
-                              (((selectedAsset.currentPrice - selectedAsset.purchasePrice) / selectedAsset.purchasePrice) * 100).toFixed(2) : 
-                              '0.00'}%)
-                          </span>
-                        </p>
-                      </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        gap: "0.5rem",
+                      }}
+                    >
+                      <button
+                        onClick={handleAddOrUpdate}
+                        style={buttonStyle("primary")}
+                      >
+                        {isEditing ? "Update Asset" : "Add Asset"}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setFormData({
+                            id: null,
+                            assetName: "",
+                            assetType: "stock",
+                            quantity: "",
+                            purchasePrice: "",
+                            symbol: "",
+                          });
+                          setShowModal(false);
+                        }}
+                        style={buttonStyle("danger")}
+                      >
+                        Cancel
+                      </button>
                     </div>
-                  </div>
-
-                  <div className="flex justify-end space-x-2">
-                    <button
-                      onClick={() => {
-                        handleEdit(selectedAsset);
-                        setShowModal(false);
-                      }}
-                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                    >
-                      Edit Asset
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleDelete(selectedAsset.id);
-                        setShowModal(false);
-                      }}
-                      className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                    >
-                      Delete Asset
-                    </button>
-                  </div>
-                </div>
+                  </>
+                )}
               </div>
             </div>
           )}
+
+          {/* CSS Animations */}
+          <style>
+            {`
+              @keyframes slideIn {
+                from { transform: translateY(20px); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
+              }
+              div:hover[style*="transition: transform"] {
+                transform: translateY(-2px);
+                box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+              }
+              button:hover[style*="transition: opacity"] {
+                opacity: 0.9;
+              }
+              input:focus, select:focus {
+                outline: none;
+                border-color: ${colors.primary};
+                box-shadow: 0 0 0 3px ${colors.primary}20;
+              }
+              tr:hover {
+                background: #f8fafc;
+              }
+              button[style*="padding: 0.5rem;"]:hover:nth-child(1) {
+                background: #e0e7ff;
+              }
+              button[style*="padding: 0.5rem;"]:hover:nth-child(2) {
+                background: #fee2e2;
+              }
+            `}
+          </style>
         </>
       )}
     </div>

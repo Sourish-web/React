@@ -38,7 +38,8 @@ function ViewUsers() {
     { name: "Goals", icon: <FiTarget size={18} />, path: "/goals" },
     { name: "Subscriptions", icon: <FiRefreshCw size={18} />, path: "/subscriptions" },
     { name: "Settings", icon: <FiSettings size={18} />, path: "/settings" },
-    { name: "Users", icon: <FiUsers size={18} />, path: "/users" },
+    { name: "CombinedTracker ", icon: <FiUsers size={18} />, path: "/CombinedTracker" },
+
   ];
 
   // Mock stats data
