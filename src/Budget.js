@@ -2,91 +2,117 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Cookies from "universal-cookie";
 import { useNavigate } from "react-router-dom";
-import { Pie, Bar, Line } from "react-chartjs-2";
-import * as XLSX from "xlsx";
-import { Chart, LinearScale, CategoryScale, BarElement, PointElement, LineElement, ArcElement, Tooltip, Legend, Title } from "chart.js";
-import { Card, Alert, LinearProgress, Chip, Grid, Switch, Button, TextField, Typography, Paper } from "@mui/material";
-import { ThemeProvider, createTheme } from "@mui/material/styles";
-import { SaveAlt, Undo, Edit, Delete, DarkMode, LightMode } from "@mui/icons-material";
-
-// Register Chart.js components
-Chart.register(LinearScale, CategoryScale, BarElement, PointElement, LineElement, ArcElement, Tooltip, Legend, Title);
+import { FiHome, FiCalendar, FiDollarSign, FiFlag, FiBarChart, FiPlus, FiEdit, FiTrash2 } from "react-icons/fi";
 
 const Budget = () => {
-  const [budgets, setBudgets] = useState([]);
-  const [transactions, setTransactions] = useState([]); // Mock/optional data
-  const [form, setForm] = useState({
-    id: null,
-    amount: "",
-    period: "monthly",
-    spent: "",
-    startDate: new Date().toISOString().split('T')[0],
-    endDate: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0]
-  });
-  const [isEditing, setIsEditing] = useState(false);
-  const [deleted, setDeleted] = useState(null);
-  const [filter, setFilter] = useState("all");
-  const [darkMode, setDarkMode] = useState(false);
-  const [simulatedRollover, setSimulatedRollover] = useState({});
-
   const cookies = new Cookies();
   const navigate = useNavigate();
   const API_URL = "http://localhost:8090";
   const getAuthToken = () => cookies.get("token");
 
-  // Dark theme setup
-  const theme = createTheme({
-    palette: {
-      mode: darkMode ? 'dark' : 'light',
-    },
+  // State management
+  const [budgets, setBudgets] = useState([]);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [form, setForm] = useState({
+    id: null,
+    amount: "",
+    period: "MONTHLY",
+    spent: "0",
+    startDate: new Date().toISOString().split("T")[0],
+    endDate: new Date(new Date().setMonth(new Date().getMonth() + 1))
+      .toISOString()
+      .split("T")[0],
+    category: "OTHER",
   });
 
-  // Fetch budgets
+  // Categories and periods matching backend enums
+  const categories = [
+    "FOOD",
+    "TRANSPORT",
+    "HOUSING",
+    "ENTERTAINMENT",
+    "UTILITIES",
+    "HEALTHCARE",
+    "EDUCATION",
+    "SAVINGS",
+    "OTHER",
+  ];
+  const periods = ["WEEKLY", "MONTHLY", "YEARLY"];
+
+  // Fetch budgets from backend
   const fetchBudgets = async () => {
     const token = getAuthToken();
-    if (!token) return navigate("/login");
+    if (!token) {
+      navigate("/login");
+      return;
+    }
     try {
       const res = await axios.get(`${API_URL}/getBudget`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setBudgets(res.data);
+      setBudgets(
+        res.data.map((budget) => ({
+          ...budget,
+          amount: Number(budget.amount),
+          spent: Number(budget.spent || 0),
+          startDate: budget.startDate.split("T")[0], // Ensure date is in YYYY-MM-DD format
+          endDate: budget.endDate.split("T")[0], // Ensure date is in YYYY-MM-DD format
+        }))
+      );
     } catch (err) {
       console.error("Failed to fetch budgets:", err);
+      alert("Failed to fetch budgets.");
     }
-  };
-
-  // Mock transaction fetch (optional)
-  const fetchTransactions = async () => {
-    // In a real app, you'd call your backend API
-    setTransactions([
-      { id: 1, amount: 150, category: "food", date: "2023-05-01", budgetId: 1 },
-      { id: 2, amount: 200, category: "transport", date: "2023-05-02", budgetId: 2 }
-    ]);
   };
 
   useEffect(() => {
     fetchBudgets();
-    fetchTransactions();
   }, []);
+
+  // Summary calculations
+  const totalBudget = budgets.reduce((sum, b) => sum + (b.amount || 0), 0);
+  const totalUsed = budgets.reduce((sum, b) => sum + (b.spent || 0), 0);
+  const totalLeft = totalBudget - totalUsed;
 
   // Form handlers
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const token = getAuthToken();
-    const endpoint = isEditing ? "/updateBudget" : "/addBudget";
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+
+    const payload = {
+      id: isEditing ? form.id : undefined, // Include id only for updates
+      amount: Number(form.amount),
+      spent: Number(form.spent || 0),
+      period: form.period,
+      category: form.category,
+      startDate: form.startDate,
+      endDate: form.endDate,
+    };
+
     try {
-      await axios.post(`${API_URL}${endpoint}`, form, { 
-        headers: { Authorization: `Bearer ${token}` } 
+      const endpoint = isEditing ? "/updateBudget" : "/addBudget";
+      await axios.post(`${API_URL}${endpoint}`, payload, {
+        headers: { Authorization: `Bearer ${token}` },
       });
       resetForm();
       fetchBudgets();
     } catch (err) {
-      console.error("Error submitting budget:", err);
+      console.error(`Error ${isEditing ? "updating" : "adding"} budget:`, err);
+      alert(
+        `Error ${isEditing ? "updating" : "adding"} budget: ${
+          err.response?.data || "Unknown error"
+        }`
+      );
     }
   };
 
@@ -94,382 +120,645 @@ const Budget = () => {
     setForm({
       id: null,
       amount: "",
-      period: "monthly",
-      spent: "",
-      startDate: new Date().toISOString().split('T')[0],
-      endDate: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString().split('T')[0]
+      period: "MONTHLY",
+      spent: "0",
+      startDate: new Date().toISOString().split("T")[0],
+      endDate: new Date(new Date().setMonth(new Date().getMonth() + 1))
+        .toISOString()
+        .split("T")[0],
+      category: "OTHER",
     });
     setIsEditing(false);
+    setOpenDialog(false);
   };
 
-  // Budget actions
   const handleEdit = (budget) => {
-    setForm(budget);
+    setForm({
+      id: budget.id,
+      amount: budget.amount.toString(),
+      spent: budget.spent.toString(),
+      period: budget.period,
+      category: budget.category,
+      startDate: budget.startDate, // Already formatted as YYYY-MM-DD
+      endDate: budget.endDate, // Already formatted as YYYY-MM-DD
+    });
     setIsEditing(true);
+    setOpenDialog(true);
   };
 
   const handleDelete = async (id) => {
     const token = getAuthToken();
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+    if (!window.confirm("Are you sure you want to delete this budget?")) {
+      return;
+    }
     try {
-      const budgetToDelete = budgets.find(b => b.id === id);
-      setDeleted(budgetToDelete);
-      setBudgets(budgets.filter(b => b.id !== id));
       await axios.get(`${API_URL}/Budget/delete/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      fetchBudgets();
     } catch (err) {
-      console.error("Delete failed", err);
+      console.error("Delete failed:", err);
+      alert(`Delete failed: ${err.response?.data || "Unknown error"}`);
     }
   };
 
-  const undoDelete = () => {
-    if (deleted) {
-      setForm(deleted);
-      setIsEditing(true);
-      setDeleted(null);
-    }
-  };
+  // Hover effects for sidebar items, buttons, and cards
+  useEffect(() => {
+    const sidebarItems = document.querySelectorAll(".sidebar-item");
+    sidebarItems.forEach((item) => {
+      const isActive = item.classList.contains("active");
+      item.addEventListener("mouseenter", () => {
+        item.style.backgroundColor = isActive ? "rgba(0, 196, 180, 0.3)" : "#e0e0e0";
+      });
+      item.addEventListener("mouseleave", () => {
+        item.style.backgroundColor = isActive ? "rgba(0, 196, 180, 0.2)" : "transparent";
+      });
+    });
 
-  // New features implementation
-  const exportToCSV = () => {
-    const csv = budgets.map(b => `${b.period},${b.amount},${b.spent}`).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "budgets.csv";
-    link.click();
-  };
+    const buttons = document.querySelectorAll(".action-button");
+    buttons.forEach((button) => {
+      const isDelete = button.classList.contains("delete-button");
+      button.addEventListener("mouseenter", () => {
+        button.style.background = isDelete
+          ? "#dc2626"
+          : "linear-gradient(145deg, #00c4b4, #00a69a)";
+        button.style.transform = "scale(1.05)";
+      });
+      button.addEventListener("mouseleave", () => {
+        button.style.background = isDelete ? "#ef4444" : "#00c4b4";
+        button.style.transform = "scale(1)";
+      });
+    });
 
-  const simulateRollover = (budgetId) => {
-    const budget = budgets.find(b => b.id === budgetId);
-    const remaining = budget.amount - budget.spent;
-    setSimulatedRollover(prev => ({
-      ...prev,
-      [budgetId]: remaining > 0 ? remaining : 0
-    }));
-  };
+    const cards = document.querySelectorAll(".overview-card");
+    cards.forEach((card) => {
+      card.addEventListener("mouseenter", () => {
+        card.style.transform = "scale(1.05)";
+        card.style.boxShadow = "0 4px 8px rgba(0,0,0,0.15)";
+      });
+      card.addEventListener("mouseleave", () => {
+        card.style.transform = "scale(1)";
+        card.style.boxShadow = "0 2px 4px rgba(0,0,0,0.1)";
+      });
+    });
 
-  // Filter and calculations
-  const filteredBudgets = budgets.filter(b => 
-    filter === "all" || b.period === filter
-  );
-
-  const getCategorySpending = () => {
-    return transactions.reduce((acc, t) => {
-      acc[t.category] = (acc[t.category] || 0) + t.amount;
-      return acc;
-    }, {});
-  };
-
-  // Chart data
-  const pieData = {
-    labels: filteredBudgets.map(b => b.period),
-    datasets: [{
-      data: filteredBudgets.map(b => b.amount),
-      backgroundColor: ["#FF6384", "#36A2EB", "#FFCE56"]
-    }]
-  };
-
-  const barData = {
-    labels: filteredBudgets.map(b => b.period),
-    datasets: [
-      {
-        label: "Budgeted",
-        data: filteredBudgets.map(b => b.amount),
-        backgroundColor: "#4CAF50"
-      },
-      {
-        label: "Spent",
-        data: filteredBudgets.map(b => b.spent),
-        backgroundColor: "#F44336"
-      }
-    ]
-  };
+    return () => {
+      sidebarItems.forEach((item) => {
+        item.removeEventListener("mouseenter", () => {});
+        item.removeEventListener("mouseleave", () => {});
+      });
+      buttons.forEach((button) => {
+        button.removeEventListener("mouseenter", () => {});
+        button.removeEventListener("mouseleave", () => {});
+      });
+      cards.forEach((card) => {
+        card.removeEventListener("mouseenter", () => {});
+        card.removeEventListener("mouseleave", () => {});
+      });
+    };
+  }, []);
 
   return (
-    <ThemeProvider theme={theme}>
-      <Paper sx={{ p: 3, minHeight: '100vh' }}>
-        {/* Header */}
-        <Grid container justifyContent="space-between" alignItems="center" mb={3}>
-          <Typography variant="h4" component="h1">
-            Budget Manager
-          </Typography>
-          <Switch 
-            checked={darkMode} 
-            onChange={() => setDarkMode(!darkMode)} 
-            icon={<LightMode />} 
-            checkedIcon={<DarkMode />}
-          />
-        </Grid>
+    <div style={styles.container}>
+      {/* Header */}
+      <header style={styles.header}>
+        <div style={styles.logo}>
+          <span style={styles.logoText}>ExpenseMate</span>
+        </div>
+      </header>
 
-        {/* Budget Form */}
-        <Card sx={{ p: 3, mb: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            {isEditing ? "Edit Budget" : "Create New Budget"}
-          </Typography>
-          <Grid container spacing={2} component="form" onSubmit={handleSubmit}>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Amount"
-                type="number"
-                name="amount"
-                value={form.amount}
-                onChange={handleChange}
-                required
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Spent"
-                type="number"
-                name="spent"
-                value={form.spent}
-                onChange={handleChange}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                select
-                label="Period"
-                name="period"
-                value={form.period}
-                onChange={handleChange}
-                SelectProps={{ native: true }}
+      {/* Main Layout */}
+      <div style={styles.layout}>
+        {/* Sidebar Navigation */}
+        <nav style={styles.sidebar}>
+          <ul style={styles.sidebarList}>
+            {[
+              { text: "Dashboard", icon: <FiHome size={18} />, path: "/dashboard" },
+              { text: "Budgets", icon: <FiCalendar size={18} />, path: "/budgets", active: true },
+              { text: "Transactions", icon: <FiDollarSign size={18} />, path: "/transactions" },
+              { text: "Goals", icon: <FiFlag size={18} />, path: "/goals" },
+              { text: "Reports", icon: <FiBarChart size={18} />, path: "/reports" },
+            ].map((item) => (
+              <li
+                key={item.text}
+                className={`sidebar-item ${item.active ? "active" : ""}`}
+                style={{
+                  ...styles.sidebarItem,
+                  backgroundColor: item.active ? "rgba(0, 196, 180, 0.2)" : "transparent",
+                  color: item.active ? "#00c4b4" : "#333",
+                }}
+                onClick={() => navigate(item.path)}
               >
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-                <option value="yearly">Yearly</option>
-              </TextField>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Start Date"
-                type="date"
-                name="startDate"
-                value={form.startDate}
-                onChange={handleChange}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="End Date"
-                type="date"
-                name="endDate"
-                value={form.endDate}
-                onChange={handleChange}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Button 
-                type="submit" 
-                variant="contained" 
-                color="primary"
-                startIcon={isEditing ? <Edit /> : <SaveAlt />}
-              >
-                {isEditing ? "Update" : "Save"} Budget
-              </Button>
-              {isEditing && (
-                <Button 
-                  variant="outlined" 
-                  onClick={resetForm}
-                  sx={{ ml: 2 }}
-                >
-                  Cancel
-                </Button>
-              )}
-            </Grid>
-          </Grid>
-        </Card>
-
-        {/* Filters and Actions */}
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={4}>
-            <TextField
-              fullWidth
-              select
-              label="Filter by Period"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              SelectProps={{ native: true }}
-            >
-              <option value="all">All Periods</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-              <option value="yearly">Yearly</option>
-            </TextField>
-          </Grid>
-          <Grid item xs={12} sm={4}>
-            <Button 
-              fullWidth 
-              variant="outlined" 
-              onClick={exportToCSV}
-              startIcon={<SaveAlt />}
-            >
-              Export CSV
-            </Button>
-          </Grid>
-          <Grid item xs={12} sm={4}>
-            <Button 
-              fullWidth 
-              variant="outlined" 
-              onClick={() => XLSX.writeFile(
-                XLSX.utils.json_to_sheet(budgets), 
-                "budgets.xlsx"
-              )}
-              startIcon={<SaveAlt />}
-            >
-              Export Excel
-            </Button>
-          </Grid>
-        </Grid>
-
-        {/* Deleted Notification */}
-        {deleted && (
-          <Alert 
-            severity="warning" 
-            action={
-              <Button color="inherit" size="small" onClick={undoDelete}>
-                <Undo fontSize="small" /> Undo
-              </Button>
-            }
-            sx={{ mb: 3 }}
+                <span style={{ ...styles.sidebarIcon, color: item.active ? "#00c4b4" : "#666" }}>
+                  {item.icon}
+                </span>
+                <span>{item.text}</span>
+              </li>
+            ))}
+          </ul>
+          <button
+            style={styles.addButton}
+            className="action-button"
+            onClick={() => setOpenDialog(true)}
           >
-            Budget deleted successfully
-          </Alert>
-        )}
+            <FiPlus size={18} style={{ marginRight: "0.5rem" }} /> Add
+          </button>
+        </nav>
 
-        {/* Budget Cards */}
-        <Grid container spacing={3} sx={{ mb: 4 }}>
-          {filteredBudgets.map(budget => {
-            const progress = (budget.spent / budget.amount) * 100;
-            const daysLeft = Math.ceil(
-              (new Date(budget.endDate) - new Date()) / (1000 * 60 * 60 * 24)
-            );
-            const remaining = budget.amount - budget.spent;
-            
-            return (
-              <Grid item xs={12} sm={6} md={4} key={budget.id}>
-                <Card sx={{ p: 2 }}>
-                  <Typography variant="h6" gutterBottom>
-                    {budget.period} Budget
-                  </Typography>
-                  
-                  {/* Progress Bar */}
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={progress > 100 ? 100 : progress} 
-                    color={
-                      progress > 90 ? "error" : 
-                      progress > 50 ? "warning" : "success"
-                    }
-                    sx={{ height: 10, mb: 1 }}
-                  />
-                  
-                  <Typography variant="body2" gutterBottom>
-                    ${budget.spent} of ${budget.amount} ({progress.toFixed(1)}%)
-                  </Typography>
-                  
-                  {/* Alerts */}
-                  {progress > 90 && (
-                    <Alert severity="error" sx={{ mb: 1 }}>
-                      {progress >= 100 ? "Budget exceeded!" : "Close to limit!"}
-                    </Alert>
-                  )}
-                  
-                  {/* Days Left */}
-                  <Chip 
-                    label={`${daysLeft >= 0 ? daysLeft : 0} days left`} 
-                    color={daysLeft < 7 ? "error" : "default"}
-                    size="small"
-                    sx={{ mb: 1 }}
-                  />
-                  
-                  {/* Rollover Simulation */}
-                  {remaining > 0 && (
-                    <Button 
-                      size="small" 
-                      onClick={() => simulateRollover(budget.id)}
-                      sx={{ display: 'block', mb: 1 }}
-                    >
-                      Simulate rollover: +${remaining}
-                    </Button>
-                  )}
-                  
-                  {simulatedRollover[budget.id] && (
-                    <Typography variant="caption" color="text.secondary">
-                      Next month would be: ${budget.amount + simulatedRollover[budget.id]}
-                    </Typography>
-                  )}
-                  
-                  {/* Actions */}
-                  <Grid container spacing={1} sx={{ mt: 1 }}>
-                    <Grid item>
-                      <Button 
-                        size="small" 
-                        startIcon={<Edit />}
-                        onClick={() => handleEdit(budget)}
-                      >
-                        Edit
-                      </Button>
-                    </Grid>
-                    <Grid item>
-                      <Button 
-                        size="small" 
-                        startIcon={<Delete />}
-                        onClick={() => handleDelete(budget.id)}
-                        color="error"
-                      >
-                        Delete
-                      </Button>
-                    </Grid>
-                  </Grid>
-                </Card>
-              </Grid>
-            );
-          })}
-        </Grid>
+        {/* Main Content */}
+        <main style={styles.main}>
+          <section style={styles.section}>
+            {/* Page Title */}
+            <h2 style={styles.sectionTitle}>Budgets</h2>
+            {/* Add Budget Button */}
+            <div style={styles.buttonContainer}>
+              <button
+                style={styles.addButton}
+                className="action-button"
+                onClick={() => setOpenDialog(true)}
+              >
+                Add Budget
+              </button>
+            </div>
 
-        {/* Charts Section */}
-        <Grid container spacing={3}>
-          {/* Budget vs Actual */}
-          <Grid item xs={12} md={6}>
-            <Card sx={{ p: 2 }}>
-              <Typography variant="h6" gutterBottom>
-                Budget vs Actual Spending
-              </Typography>
-              <Bar data={barData} />
-            </Card>
-          </Grid>
-          
-          {/* Category Breakdown */}
-          {transactions.length > 0 && (
-            <Grid item xs={12} md={6}>
-              <Card sx={{ p: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                  Spending by Category
-                </Typography>
-                <Pie data={{
-                  labels: Object.keys(getCategorySpending()),
-                  datasets: [{
-                    data: Object.values(getCategorySpending()),
-                    backgroundColor: ["#FF6384", "#36A2EB", "#FFCE56", "#8e44ad"]
-                  }]
-                }} />
-              </Card>
-            </Grid>
-          )}
-        </Grid>
-      </Paper>
-    </ThemeProvider>
+            {/* Budget Overview Cards */}
+            <div style={styles.overviewContainer}>
+              <div style={styles.overviewCard} className="overview-card">
+                <p style={styles.cardLabel}>Total Budget</p>
+                <p style={styles.cardValue}>Rs. {totalBudget.toLocaleString()}</p>
+              </div>
+              <div style={styles.overviewCard} className="overview-card">
+                <p style={styles.cardLabel}>Total Used</p>
+                <p style={styles.cardValue}>Rs. {totalUsed.toLocaleString()}</p>
+              </div>
+              <div style={styles.overviewCard} className="overview-card">
+                <p style={styles.cardLabel}>Total Left</p>
+                <p
+                  style={{
+                    ...styles.cardValue,
+                    color: totalLeft >= 0 ? "#4caf50" : "#f44336",
+                  }}
+                >
+                  Rs. {totalLeft.toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            {/* Budget Table */}
+            <div style={styles.tableContainer}>
+              <table style={styles.table}>
+                <thead>
+ |                  <tr style={styles.tableHeader}>
+                    <th style={styles.tableCell}>Name</th>
+                    <th style={styles.tableCell}>Budget</th>
+                    <th style={styles.tableCell}>Used Amount</th>
+                    <th style={styles.tableCell}>Balance Left</th>
+                    <th style={styles.tableCell}>Actions</th> {/* Updated header */}
+                  </tr>
+                </thead>
+                <tbody>
+                  {budgets.map((budget) => {
+                    const progress = (budget.spent / budget.amount) * 100;
+                    const balance = budget.amount - budget.spent;
+                    return (
+                      <tr key={budget.id} style={styles.tableRow}>
+                        <td style={styles.tableCell}>
+                          {budget.category.charAt(0) +
+                            budget.category.slice(1).toLowerCase()}
+                        </td>
+                        <td style={styles.tableCell}>
+                          Rs. {budget.amount.toLocaleString()}
+                        </td>
+                        <td style={styles.tableCell}>
+                          <p style={{ marginBottom: "0.5rem" }}>
+                            Rs. {budget.spent.toLocaleString()}
+                          </p>
+                          <div style={styles.progressBar}>
+                            <div
+                              style={{
+                                ...styles.progressFill,
+                                width: `${progress > 100 ? 100 : progress}%`,
+                                background:
+                                  progress > 90
+                                    ? "#f44336"
+                                    : progress > 50
+                                    ? "#ff9800"
+                                    : "#4caf50",
+                              }}
+                            ></div>
+                          </div>
+                          <p style={{ fontSize: "0.75rem", color: "#666" }}>
+                            {(progress || 0).toFixed(1)}%
+                          </p>
+                        </td>
+                        <td
+                          style={{
+                            ...styles.tableCell,
+                            color: balance >= 0 ? "#4caf50" : "#f44336",
+                          }}
+                        >
+                          Rs. {balance.toLocaleString()}
+                        </td>
+                        <td style={styles.tableCell}>
+                          <button
+                            onClick={() => handleEdit(budget)}
+                            style={styles.editButton}
+                            className="action-button"
+                          >
+                            <FiEdit size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(budget.id)}
+                            style={styles.deleteButton}
+                            className="action-button delete-button"
+                          >
+                            <FiTrash2 size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </main>
+      </div>
+
+      {/* Add/Edit Budget Dialog */}
+      {openDialog && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+            <h3 style={styles.modalTitle}>
+              {isEditing ? "Edit Budget" : "Add Budget"}
+            </h3>
+            <div style={styles.form}>
+              <div style={styles.formGroup}>
+                <label style={styles.formLabel}>Category</label>
+                <select
+                  name="category"
+                  value={form.category}
+                  onChange={handleChange}
+                  style={styles.formSelect}
+                >
+                  {categories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat.charAt(0) + cat.slice(1).toLowerCase()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div style={styles.formGroup}>
+                <label style={styles.formLabel}>Amount</label>
+                <input
+                  type="number"
+                  name="amount"
+                  value={form.amount}
+                  onChange={handleChange}
+                  required
+                  style={styles.formInput}
+                />
+              </div>
+              <div style={styles.formGroup}>
+                <label style={styles.formLabel}>Spent</label>
+                <input
+                  type="number"
+                  name="spent"
+                  value={form.spent}
+                  onChange={handleChange}
+                  style={styles.formInput}
+                />
+              </div>
+              <div style={styles.formGroup}>
+                <label style={styles.formLabel}>Period</label>
+                <select
+                  name="period"
+                  value={form.period}
+                  onChange={handleChange}
+                  style={styles.formSelect}
+                >
+                  {periods.map((period) => (
+                    <option key={period} value={period}>
+                      {period.charAt(0) + period.slice(1).toLowerCase()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div style={styles.formGroup}>
+                <label style={styles.formLabel}>Start Date</label>
+                <input
+                  type="date"
+                  name="startDate"
+                  value={form.startDate}
+                  onChange={handleChange}
+                  style={styles.formInput}
+                />
+              </div>
+              <div style={styles.formGroup}>
+                <label style={styles.formLabel}>End Date</label>
+                <input
+                  type="date"
+                  name="endDate"
+                  value={form.endDate}
+                  onChange={handleChange}
+                  style={styles.formInput}
+                />
+              </div>
+            </div>
+            <div style={styles.modalActions}>
+              <button
+                onClick={resetForm}
+                style={styles.cancelButton}
+                className="action-button"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                style={styles.submitButton}
+                className="action-button"
+              >
+                {isEditing ? "Update" : "Add"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
+};
+
+const styles = {
+  container: {
+    fontFamily: "'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+    background: "#ffffff",
+    minHeight: "100vh",
+    boxSizing: "border-box",
+  },
+  header: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    background: "#0f2b5b",
+    padding: "1rem 1.5rem",
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+    boxSizing: "border-box",
+    maxWidth: "100vw",
+    overflow: "hidden",
+  },
+  logo: {
+    display: "flex",
+    alignItems: "center",
+    flexShrink: 0,
+  },
+  logoText: {
+    fontSize: "1.5rem",
+    fontWeight: 700,
+    background: "linear-gradient(90deg, #4f46e5, #00c4b4)",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    whiteSpace: "nowrap",
+  },
+  layout: {
+    display: "flex",
+    paddingTop: "64px",
+  },
+  sidebar: {
+    width: "160px",
+    background: "#f5f6f5",
+    height: "calc(100vh - 64px)",
+    position: "fixed",
+    top: "64px",
+    left: 0,
+    borderRight: "1px solid #e5e7eb",
+    boxSizing: "border-box",
+  },
+  sidebarList: {
+    listStyle: "none",
+    padding: 0,
+    margin: 0,
+    paddingTop: "1rem",
+  },
+  sidebarItem: {
+    display: "flex",
+    alignItems: "center",
+    padding: "0 1rem",
+    height: "2.5rem",
+    cursor: "pointer",
+    transition: "background-color 0.3s",
+    fontSize: "0.875rem",
+    lineHeight: "1",
+  },
+  sidebarIcon: {
+    marginRight: "0.5rem",
+  },
+  addButton: {
+    background: "#00c4b4",
+    color: "#ffffff",
+    border: "none",
+    padding: "0.75rem 1.5rem",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "0.875rem",
+    fontWeight: 500,
+    margin: "1rem",
+    display: "flex",
+    alignItems: "center",
+    transition: "background 0.3s, transform 0.3s",
+  },
+  main: {
+    marginLeft: "160px",
+    padding: "1rem 1rem 2rem",
+    flexGrow: 1,
+    boxSizing: "border-box",
+  },
+  section: {
+    padding: "0",
+    background: "#f5f6f5",
+  },
+  sectionTitle: {
+    fontSize: "2rem",
+    fontWeight: 700,
+    color: "#333333",
+    marginBottom: "1.5rem",
+    lineHeight: "1",
+  },
+  buttonContainer: {
+    marginBottom: "2rem",
+  },
+  overviewContainer: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+    gap: "0.5rem",
+    marginBottom: "2rem",
+  },
+  overviewCard: {
+    background: "#ffffff",
+    borderRadius: "8px",
+    padding: "0.5rem 2rem",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+    transition: "transform 0.3s, box-shadow 0.3s",
+    animation: "fadeIn 0.8s ease-out",
+    border: "1px solid #e5e7eb",
+  },
+  cardLabel: {
+    fontSize: "0.75rem",
+    color: "#666",
+    margin: 0,
+  },
+  cardValue: {
+    fontSize: "1rem",
+    fontWeight: 700,
+    color: "#333333",
+    margin: "0.25rem 0 0",
+  },
+  tableContainer: {
+    background: "#ffffff",
+    borderRadius: "8px",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+    overflowX: "auto",
+    animation: "fadeIn 0.8s ease-out",
+  },
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+  },
+  tableHeader: {
+    background: "#f5f6f5",
+  },
+  tableCell: {
+    padding: "0.75rem",
+    fontSize: "0.875rem",
+    color: "#333333",
+    textAlign: "left",
+    borderBottom: "1px solid #e5e7eb",
+  },
+  tableRow: {
+    transition: "background-color 0.3s",
+  },
+  progressBar: {
+    height: "8px",
+    borderRadius: "4px",
+    background: "#e0e0e0",
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    transition: "width 0.3s",
+  },
+  editButton: {
+    background: "#00c4b4",
+    color: "#ffffff",
+    border: "none",
+    padding: "0.5rem",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "0.875rem",
+    transition: "background 0.3s, transform 0.3s",
+    marginRight: "0.5rem",
+  },
+  deleteButton: {
+    background: "#ef4444",
+    color: "#ffffff",
+    border: "none",
+    padding: "0.5rem",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "0.875rem",
+    transition: "background 0.3s, transform 0.3s",
+  },
+  modalOverlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: "rgba(0, 0, 0, 0.3)",
+    backdropFilter: "blur(5px)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1000,
+  },
+  modal: {
+    background: "#ffffff",
+    borderRadius: "15px",
+    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.2)",
+    padding: "2rem",
+    width: "90%",
+    maxWidth: "500px",
+    animation: "fadeIn 0.3s ease-in-out",
+  },
+  modalTitle: {
+    fontSize: "1.5rem",
+    fontWeight: 700,
+    color: "#333333",
+    marginBottom: "1rem",
+  },
+  form: {
+    display: "grid",
+    gap: "1rem",
+  },
+  formGroup: {
+    display: "flex",
+    flexDirection: "column",
+  },
+  formLabel: {
+    fontSize: "0.875rem",
+    color: "#666",
+    marginBottom: "0.25rem",
+  },
+  formInput: {
+    padding: "0.5rem",
+    border: "1px solid #e0e0e0",
+    borderRadius: "4px",
+    fontSize: "0.875rem",
+    outline: "none",
+    transition: "border-color 0.3s",
+  },
+  formSelect: {
+    padding: "0.5rem",
+    border: "1px solid #e0e0e0",
+    borderRadius: "4px",
+    fontSize: "0.875rem",
+    outline: "none",
+    transition: "border-color 0.3s",
+  },
+  modalActions: {
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: "1rem",
+    marginTop: "1rem",
+  },
+  cancelButton: {
+    background: "#666",
+    color: "#ffffff",
+    border: "none",
+    padding: "0.5rem 1rem",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "0.875rem",
+    transition: "background 0.3s, transform 0.3s",
+  },
+  submitButton: {
+    background: "#00c4b4",
+    color: "#ffffff",
+    border: "none",
+    padding: "0.5rem 1rem",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "0.875rem",
+    transition: "background 0.3s, transform 0.3s",
+  },
 };
 
 export default Budget;

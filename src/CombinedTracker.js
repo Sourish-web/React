@@ -22,8 +22,6 @@ import {
   CartesianGrid,
 } from "recharts";
 import {
-  Card,
-  CardContent,
   Typography,
   Grid,
   Button,
@@ -45,8 +43,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Snackbar,
-  Alert,
   Tabs,
   Tab,
   Box,
@@ -58,11 +54,10 @@ import {
   Search,
   AttachMoney,
   FileDownload,
-  DarkMode,
-  LightMode,
   Savings,
   Receipt,
   ShowChart,
+  Wallet,
 } from "@mui/icons-material";
 import { FiLogOut } from "react-icons/fi";
 
@@ -85,13 +80,8 @@ const CombinedTracker = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [budgets, setBudgets] = useState([]);
   const [transactions, setTransactions] = useState([]);
-  const [darkMode, setDarkMode] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editType, setEditType] = useState(null);
-  const [deletedItem, setDeletedItem] = useState(null);
-  const [openSnackbar, setOpenSnackbar] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState("");
-  const [snackbarSeverity, setSnackbarSeverity] = useState("success");
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
   const [savingsHistory, setSavingsHistory] = useState(() => {
@@ -148,143 +138,260 @@ const CombinedTracker = () => {
   const periods = ["WEEKLY", "MONTHLY", "YEARLY"];
 
   // Chart colors
-  const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#f87171", "#34d399", "#60a5fa", "#fbbf24", "#a78bfa", "#f472b6"];
-
-  // Enhanced color palette
-  const themeColors = {
-    primary: darkMode ? "#00c4b4" : "#4f46e5",
-    success: "#10b981",
-    warning: "#f59e0b",
-    error: "#ef4444",
-    background: darkMode ? "#1a1b1e" : "#ffffff",
-    text: darkMode ? "#e2e8f0" : "#333333",
-    cardBackground: darkMode ? "#2d2d2d" : "#ffffff",
-  };
+  const COLORS = ["#4f46e5", "#2dd4bf", "#f59e0b", "#ef4444", "#10b981", "#7dd3fc", "#f472b6", "#a78bfa", "#34d399"];
 
   // Custom styled components
-  const StyledCard = ({ children, ...props }) => (
-    <Card
+  const StyledSection = ({ children, ...props }) => (
+    <div
       {...props}
-      sx={{
-        backgroundColor: themeColors.cardBackground,
+      style={{
+        backgroundColor: "#ffffff",
+        border: "1px solid #e2e8f0",
         borderRadius: "8px",
-        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-        border: "1px solid #e5e7eb",
-        transition: "transform 0.3s, box-shadow 0.3s",
-        "&:hover": {
-          transform: "scale(1.02)",
-          boxShadow: "0 4px 8px rgba(0,0,0,0.15)",
-        },
+        padding: "1.5rem",
+        marginBottom: "1.5rem",
+        transition: "box-shadow 0.3s ease",
+        width: "100%",
+        boxSizing: "border-box",
       }}
+      onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)")}
+      onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "none")}
     >
       {children}
-    </Card>
+    </div>
   );
 
   const GradientHeader = () => (
-    <div style={styles.header}>
-      <div style={styles.logo}>
-        <span style={styles.logoText}>Financial Dashboard</span>
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-        <IconButton onClick={() => setDarkMode(!darkMode)} style={{ color: "#ffffff" }}>
-          {darkMode ? <LightMode /> : <DarkMode />}
-        </IconButton>
-        <button
-          style={styles.logoutButton}
-          onClick={() => {
-            cookies.remove("token", { path: "/" });
-            navigate("/login");
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        background: "linear-gradient(90deg, #4f46e5, #2dd4bf)",
+        padding: "1rem 2rem",
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 1000,
+        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+        boxSizing: "border-box",
+        width: "100%",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center" }}>
+        <Wallet style={{ fontSize: "1.75rem", color: "#ffffff", marginRight: "0.5rem" }} />
+        <span
+          style={{
+            fontSize: "1.5rem",
+            fontWeight: 700,
+            color: "#ffffff",
+            whiteSpace: "nowrap",
           }}
-          aria-label="Log out"
         >
-          <FiLogOut size={18} /> Logout
-        </button>
+          ExpenseMate
+        </span>
       </div>
+      <button
+        style={{
+          background: "#ffffff",
+          color: "#4f46e5",
+          border: "none",
+          padding: "0.5rem 1rem",
+          borderRadius: "6px",
+          cursor: "pointer",
+          fontSize: "0.9rem",
+          fontWeight: 500,
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem",
+          transition: "background 0.3s, transform 0.3s",
+        }}
+        onClick={() => {
+          cookies.remove("token", { path: "/" });
+          navigate("/login");
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f6f5")}
+        onMouseLeave={(e) => (e.currentTarget.style.background = "#ffffff")}
+        aria-label="Log out"
+      >
+        <FiLogOut size={18} /> Logout
+      </button>
     </div>
   );
 
   const SummaryCard = ({ title, value, color, icon }) => (
-    <StyledCard className="summary-card">
-      <CardContent style={{ padding: "1.5rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <Typography style={styles.statTitle}>{title}</Typography>
-            <Typography style={{ ...styles.statValue, color }}>{`₹${typeof value === "number" ? value.toFixed(2) : value}`}</Typography>
-          </div>
-          <div style={styles.iconContainer}>
-            {React.cloneElement(icon, { style: { fontSize: "1.75rem", color } })}
-          </div>
+    <div
+      style={{
+        backgroundColor: "#f8fafc",
+        borderRadius: "8px",
+        padding: "1.5rem",
+        flex: "1 1 250px",
+        transition: "transform 0.3s ease",
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}
+      onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <Typography
+            style={{
+              fontSize: "1.2rem",
+              fontWeight: 600,
+              color: "#4b5563",
+              marginBottom: "0.5rem",
+            }}
+          >
+            {title}
+          </Typography>
+          <Typography
+            style={{
+              fontSize: "1.8rem",
+              fontWeight: 700,
+              color: color,
+            }}
+          >
+            ₹{typeof value === "number" ? value.toFixed(2) : value}
+          </Typography>
         </div>
-      </CardContent>
-    </StyledCard>
+        <div
+          style={{
+            backgroundColor: "#e2e8f0",
+            borderRadius: "8px",
+            padding: "0.75rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {React.cloneElement(icon, { style: { fontSize: "1.75rem", color } })}
+        </div>
+      </div>
+    </div>
   );
+
+  SummaryCard.propTypes = {
+    title: PropTypes.string.isRequired,
+    value: PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired,
+    color: PropTypes.string.isRequired,
+    icon: PropTypes.element.isRequired,
+  };
 
   const BudgetCard = ({ budget }) => {
     const progress = (Number(budget.spent) / Number(budget.amount)) * 100;
     const daysLeft = Math.ceil((new Date(budget.endDate) - new Date()) / (1000 * 60 * 60 * 24));
 
     return (
-      <StyledCard className="budget-card">
-        <CardContent style={{ padding: "1.5rem" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
-            <div>
-              <Typography style={styles.planName}>{budget.category}</Typography>
-              <Typography style={styles.sectionSubtitle}>
-                {budget.period.charAt(0).toUpperCase() + budget.period.slice(1).toLowerCase()}
-              </Typography>
-            </div>
-            <Chip
-              label={`${daysLeft >= 0 ? daysLeft : 0}d left`}
-              size="small"
+      <div
+        style={{
+          backgroundColor: "#ffffff",
+          border: "1px solid #e2e8f0",
+          borderRadius: "8px",
+          padding: "1.5rem",
+          transition: "box-shadow 0.3s ease",
+          width: "100%",
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)")}
+        onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "none")}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
+          <div>
+            <Typography
               style={{
-                backgroundColor: daysLeft < 7 ? themeColors.error + "15" : themeColors.primary + "15",
-                color: daysLeft < 7 ? themeColors.error : themeColors.primary,
-                fontSize: "0.75rem",
-                fontWeight: 500,
+                fontSize: "1.5rem",
+                fontWeight: 700,
+                color: "#1f2937",
               }}
-            />
+            >
+              {budget.category.charAt(0) + budget.category.slice(1).toLowerCase()}
+            </Typography>
+            <Typography
+              style={{
+                fontSize: "1rem",
+                color: "#6b7280",
+              }}
+            >
+              {budget.period.charAt(0) + budget.period.slice(1).toLowerCase()}
+            </Typography>
           </div>
-          <LinearProgress
-            variant="determinate"
-            value={progress > 100 ? 100 : progress}
-            sx={{
-              height: 8,
-              borderRadius: 4,
-              backgroundColor: darkMode ? "#374151" : "#e5e7eb",
-              "& .MuiLinearProgress-bar": {
-                borderRadius: 4,
-                backgroundColor:
-                  progress > 100 ? themeColors.error : progress > 75 ? themeColors.warning : themeColors.success,
-              },
+          <Chip
+            label={`${daysLeft >= 0 ? daysLeft : 0} days left`}
+            size="small"
+            style={{
+              backgroundColor: daysLeft < 7 ? "#ef444415" : "#4f46e515",
+              color: daysLeft < 7 ? "#ef4444" : "#4f46e5",
+              fontSize: "0.75rem",
+              fontWeight: 500,
             }}
+            aria-label={`${daysLeft} days remaining`}
           />
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "1rem" }}>
-            <Typography style={styles.sectionSubtitle}>Spent: ₹{Number(budget.spent).toFixed(2)}</Typography>
-            <Typography style={styles.sectionSubtitle}>Budget: ₹{Number(budget.amount).toFixed(2)}</Typography>
-          </div>
-          <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem", justifyContent: "flex-end" }}>
-            <IconButton
-              size="small"
-              onClick={() => handleEditBudget(budget)}
-              style={{ color: themeColors.primary }}
-              className="action-button"
-            >
-              <Edit fontSize="small" />
-            </IconButton>
-            <IconButton
-              size="small"
-              onClick={() => confirmDelete(budget, "budget")}
-              style={{ color: themeColors.error }}
-              className="action-button"
-            >
-              <Delete fontSize="small" />
-            </IconButton>
-          </div>
-        </CardContent>
-      </StyledCard>
-  );
-};
+        </div>
+        <LinearProgress
+          variant="determinate"
+          value={progress > 100 ? 100 : progress}
+          sx={{
+            height: 8,
+            borderRadius: 4,
+            backgroundColor: "#e2e8f0",
+            "& .MuiLinearProgress-bar": {
+              borderRadius: 4,
+              backgroundColor:
+                progress > 100 ? "#ef4444" : progress > 75 ? "#f59e0b" : "#10b981",
+            },
+          }}
+          aria-label={`Budget progress: ${progress.toFixed(0)}%`}
+        />
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: "1rem" }}>
+          <Typography
+            style={{
+              fontSize: "1rem",
+              color: "#6b7280",
+            }}
+          >
+            Spent: ₹{Number(budget.spent).toFixed(2)}
+          </Typography>
+          <Typography
+            style={{
+              fontSize: "1rem",
+              color: "#6b7280",
+            }}
+          >
+            Budget: ₹{Number(budget.amount).toFixed(2)}
+          </Typography>
+        </div>
+        <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem", justifyContent: "flex-end" }}>
+          <IconButton
+            size="small"
+            onClick={() => handleEditBudget(budget)}
+            style={{ color: "#4f46e5" }}
+            aria-label={`Edit ${budget.category} budget`}
+          >
+            <Edit fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            onClick={() => confirmDelete(budget, "budget")}
+            style={{ color: "#ef4444" }}
+            aria-label={`Delete ${budget.category} budget`}
+          >
+            <Delete fontSize="small" />
+          </IconButton>
+        </div>
+      </div>
+    );
+  };
+
+  BudgetCard.propTypes = {
+    budget: PropTypes.shape({
+      id: PropTypes.string.isRequired,
+      category: PropTypes.string.isRequired,
+      period: PropTypes.string.isRequired,
+      amount: PropTypes.number.isRequired,
+      spent: PropTypes.number.isRequired,
+      startDate: PropTypes.string.isRequired,
+      endDate: PropTypes.string.isRequired,
+    }).isRequired,
+  };
 
   const TransactionRow = ({ txn }) => (
     <TableRow
@@ -293,13 +400,18 @@ const CombinedTracker = () => {
         "&:last-child td, &:last-child th": { border: 0 },
         transition: "background-color 0.3s",
       }}
-      style={styles.tableRow}
     >
-      <TableCell style={styles.tableCell}>
+      <TableCell
+        style={{
+          padding: "0.75rem",
+          fontSize: "0.875rem",
+          color: "#1f2937",
+        }}
+      >
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
           <div
             style={{
-              backgroundColor: COLORS[categories.indexOf(txn.category) % COLORS.length] + "20",
+              backgroundColor: `${COLORS[categories.indexOf(txn.category) % COLORS.length]}20`,
               borderRadius: "8px",
               padding: "8px",
               display: "flex",
@@ -315,50 +427,82 @@ const CombinedTracker = () => {
             />
           </div>
           <div>
-            <Typography style={{ fontWeight: 500, color: themeColors.text }}>{txn.description}</Typography>
-            <Typography style={styles.sectionSubtitle}>
+            <Typography
+              style={{
+                fontWeight: 500,
+                color: "#1f2937",
+              }}
+            >
+              {txn.description}
+            </Typography>
+            <Typography
+              style={{
+                fontSize: "0.875rem",
+                color: "#6b7280",
+              }}
+            >
               {new Date(txn.transactionDate).toLocaleDateString()}
             </Typography>
           </div>
         </div>
       </TableCell>
-      <TableCell align="right" style={styles.tableCell}>
+      <TableCell
+        align="right"
+        style={{
+          padding: "0.75rem",
+          fontSize: "0.875rem",
+          color: "#1f2937",
+        }}
+      >
         <Typography
           style={{
             fontWeight: 600,
-            color: Number(txn.amount) >= 0 ? themeColors.success : themeColors.error,
+            color: Number(txn.amount) >= 0 ? "#10b981" : "#ef4444",
           }}
         >
           ₹{Number(txn.amount).toFixed(2)}
         </Typography>
       </TableCell>
-      <TableCell style={styles.tableCell}>
+      <TableCell
+        style={{
+          padding: "0.75rem",
+          fontSize: "0.875rem",
+          color: "#1f2937",
+        }}
+      >
         <Chip
-          label={txn.category}
+          label={txn.category.charAt(0) + txn.category.slice(1).toLowerCase()}
           size="small"
           style={{
-            backgroundColor: COLORS[categories.indexOf(txn.category) % COLORS.length] + "20",
+            backgroundColor: `${COLORS[categories.indexOf(txn.category) % COLORS.length]}20`,
             color: COLORS[categories.indexOf(txn.category) % COLORS.length],
             fontWeight: 500,
             fontSize: "0.75rem",
           }}
+          aria-label={`Category: ${txn.category}`}
         />
       </TableCell>
-      <TableCell style={styles.tableCell}>
+      <TableCell
+        style={{
+          padding: "0.75rem",
+          fontSize: "0.875rem",
+          color: "#1f2937",
+        }}
+      >
         <div style={{ display: "flex", gap: "0.5rem" }}>
           <IconButton
             size="small"
             onClick={() => handleEditTransaction(txn)}
-            style={{ color: themeColors.primary }}
-            className="action-button"
+            style={{ color: "#4f46e5" }}
+            aria-label={`Edit transaction ${txn.description}`}
           >
             <Edit fontSize="small" />
           </IconButton>
           <IconButton
             size="small"
             onClick={() => confirmDelete(txn, "transaction")}
-            style={{ color: themeColors.error }}
-            className="action-button"
+            style={{ color: "#ef4444" }}
+            aria-label={`Delete transaction ${txn.description}`}
           >
             <Delete fontSize="small" />
           </IconButton>
@@ -366,6 +510,16 @@ const CombinedTracker = () => {
       </TableCell>
     </TableRow>
   );
+
+  TransactionRow.propTypes = {
+    txn: PropTypes.shape({
+      id: PropTypes.string.isRequired,
+      description: PropTypes.string.isRequired,
+      amount: PropTypes.number.isRequired,
+      transactionDate: PropTypes.string.isRequired,
+      category: PropTypes.string.isRequired,
+    }).isRequired,
+  };
 
   // Fetch all data
   const fetchAllData = debounce(async (retryCount = 0) => {
@@ -382,7 +536,7 @@ const CombinedTracker = () => {
           headers: { Authorization: `Bearer ${token}` },
         }).catch(async (err) => {
           if (retryCount < 2 && err.response?.status >= 500) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise((resolve) => setTimeout(resolve, 1000));
             return axios.get(`${API_URL}/getBudget`, {
               headers: { Authorization: `Bearer ${token}` },
             });
@@ -394,7 +548,7 @@ const CombinedTracker = () => {
         }),
       ]);
 
-      const fetchedBudgets = (budgetsRes.data || []).map(budget => ({
+      const fetchedBudgets = (budgetsRes.data || []).map((budget) => ({
         ...budget,
         id: budget.id || `temp-${Date.now()}`,
         amount: isNaN(Number(budget.amount)) || budget.amount == null ? 0 : Number(budget.amount),
@@ -405,7 +559,7 @@ const CombinedTracker = () => {
         category: categories.includes(budget.category) ? budget.category : "OTHER",
       }));
 
-      const fetchedTransactions = (transactionsRes.data || []).map(txn => ({
+      const fetchedTransactions = (transactionsRes.data || []).map((txn) => ({
         ...txn,
         id: txn.id || `temp-${Date.now()}`,
         amount: isNaN(Number(txn.amount)) || txn.amount == null ? 0 : Number(txn.amount),
@@ -416,10 +570,10 @@ const CombinedTracker = () => {
 
       setBudgets(fetchedBudgets);
       setTransactions(fetchedTransactions);
-      setUpdateKey(prev => prev + 1);
+      setUpdateKey((prev) => prev + 1);
       calculateSavings(fetchedBudgets);
     } catch (err) {
-      showSnackbar(`Failed to fetch data: ${err.response?.data?.message || err.message}`, "error");
+      console.error(`Failed to fetch data: ${err.response?.data?.message || err.message}`);
     } finally {
       setIsLoadingBudgets(false);
     }
@@ -535,14 +689,19 @@ const CombinedTracker = () => {
   // Submit handlers
   const handleBudgetSubmit = async (e) => {
     e.preventDefault();
-    const token = cookies.get("token");
-    if (!token) return showSnackbar("Not authenticated", "error");
+    const token = cookies.get("ticket");
+    if (!token) {
+      console.error("Not authenticated");
+      return;
+    }
 
     if (!categories.includes(budgetForm.category)) {
-      return showSnackbar("Please select a valid category", "error");
+      console.error("Please select a valid category");
+      return;
     }
     if (!budgetForm.amount || isNaN(Number(budgetForm.amount)) || Number(budgetForm.amount) <= 0) {
-      return showSnackbar("Please enter a valid budget amount", "error");
+      console.error("Please enter a valid budget amount");
+      return;
     }
 
     const budgetPayload = {
@@ -564,7 +723,6 @@ const CombinedTracker = () => {
       const headers = { Authorization: `Bearer ${token}` };
       const endpoint = isEditing && editType === "budget" ? "/updateBudget" : "/addBudget";
       await axios.post(`${API_URL}${endpoint}`, budgetPayload, { headers });
-      showSnackbar(`Budget ${isEditing ? "updated" : "added"} successfully`, "success");
       resetForms();
       setTimeout(fetchAllData, 500);
     } catch (err) {
@@ -572,20 +730,21 @@ const CombinedTracker = () => {
         setBudgets((prevBudgets) => prevBudgets.filter((b) => b.id !== optimisticBudget.id));
         setUpdateKey((prev) => prev + 1);
       }
-      showSnackbar(
-        `Error saving budget: ${err.response?.data?.message || err.message}`,
-        "error"
-      );
+      console.error(`Error saving budget: ${err.response?.data?.message || err.message}`);
     }
   };
 
   const handleTransactionSubmit = async (e) => {
     e.preventDefault();
     const token = cookies.get("token");
-    if (!token) return showSnackbar("Not authenticated", "error");
+    if (!token) {
+      console.error("Not authenticated");
+      return;
+    }
 
     if (!categories.includes(transactionForm.category)) {
-      return showSnackbar("Invalid category selected", "error");
+      console.error("Invalid category selected");
+      return;
     }
 
     let optimisticTransaction = null;
@@ -601,7 +760,6 @@ const CombinedTracker = () => {
       const headers = { Authorization: `Bearer ${token}` };
       const endpoint = isEditing && editType === "transaction" ? "/transaction/update" : "/transaction/add";
       await axios.post(`${API_URL}${endpoint}`, transactionForm, { headers });
-      showSnackbar(`Transaction ${isEditing ? "updated" : "added"} successfully`, "success");
       resetForms();
       await fetchAllData();
     } catch (err) {
@@ -611,10 +769,7 @@ const CombinedTracker = () => {
         );
         setUpdateKey((prev) => prev + 1);
       }
-      showSnackbar(
-        `Error saving transaction: ${err.response?.data?.message || err.message}`,
-        "error"
-      );
+      console.error(`Error saving transaction: ${err.response?.data?.message || err.message}`);
     }
   };
 
@@ -671,14 +826,12 @@ const CombinedTracker = () => {
   const handleDelete = async () => {
     const token = cookies.get("token");
     if (!token || !itemToDelete) {
-      showSnackbar("Not authenticated. Please log in again.", "error");
+      console.error("Not authenticated. Please log in again.");
       navigate("/login");
       return;
     }
 
     try {
-      setDeletedItem({ ...itemToDelete });
-
       const endpoint =
         itemToDelete.type === "budget"
           ? `${API_URL}/Budget/delete/${itemToDelete.id}`
@@ -694,45 +847,13 @@ const CombinedTracker = () => {
         setTransactions(transactions.filter((t) => t.id !== itemToDelete.id));
       }
       await fetchAllData();
-      showSnackbar(`${itemToDelete.type === "budget" ? "Budget" : "Transaction"} deleted successfully`, "success");
     } catch (err) {
-      showSnackbar(
-        `Error deleting ${itemToDelete.type}: ${err.response?.data?.message || err.message}`,
-        "error"
+      console.error(
+        `Error deleting ${itemToDelete.type}: ${err.response?.data?.message || err.message}`
       );
     } finally {
       setOpenDeleteDialog(false);
       setItemToDelete(null);
-    }
-  };
-
-  const undoDelete = async () => {
-    if (!deletedItem) return;
-
-    const token = cookies.get("token");
-    if (!token) {
-      showSnackbar("Not authenticated. Please log in again.", "error");
-      navigate("/login");
-      return;
-    }
-
-    try {
-      const headers = { Authorization: `Bearer ${token}` };
-      const endpoint =
-        deletedItem.type === "budget" ? "/addBudget" : "/transaction/add";
-
-      const { id, type, ...itemData } = deletedItem;
-      await axios.post(`${API_URL}${endpoint}`, itemData, { headers });
-
-      await fetchAllData();
-      showSnackbar(`${deletedItem.type === "budget" ? "Budget" : "Transaction"} restored`, "success");
-    } catch (err) {
-      showSnackbar(
-        `Error restoring ${deletedItem.type}: ${err.response?.data?.message || err.message}`,
-        "error"
-      );
-    } finally {
-      setDeletedItem(null);
     }
   };
 
@@ -771,13 +892,6 @@ const CombinedTracker = () => {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, `${type}s`);
     XLSX.writeFile(workbook, `${type}s.xlsx`);
-  };
-
-  // Snackbar handler
-  const showSnackbar = (message, severity = "success") => {
-    setSnackbarMessage(message);
-    setSnackbarSeverity(severity);
-    setOpenSnackbar(true);
   };
 
   // Calculate summary
@@ -886,50 +1000,34 @@ const CombinedTracker = () => {
     fetchAllData();
   }, [navigate]);
 
-  // Add hover effects
-  useEffect(() => {
-    const cards = document.querySelectorAll(".summary-card, .budget-card, .table-container");
-    cards.forEach((card) => {
-      card.addEventListener("mouseenter", () => {
-        card.style.transform = "scale(1.02)";
-        card.style.boxShadow = "0 4px 8px rgba(0,0,0,0.15)";
-      });
-      card.addEventListener("mouseleave", () => {
-        card.style.transform = "scale(1)";
-        card.style.boxShadow = "0 2px 4px rgba(0,0,0,0.1)";
-      });
-    });
-
-    const buttons = document.querySelectorAll(".action-button, .submit-button, .filter-button");
-    buttons.forEach((button) => {
-      button.addEventListener("mouseenter", () => {
-        button.style.background = "linear-gradient(145deg, #00c4b4, #00a69a)";
-        button.style.transform = "scale(1.05)";
-      });
-      button.addEventListener("mouseleave", () => {
-        button.style.background = button.classList.contains("delete-button") ? "#ef4444" : "#00c4b4";
-        button.style.transform = "scale(1)";
-      });
-    });
-
-    return () => {
-      cards.forEach((card) => {
-        card.removeEventListener("mouseenter", () => {});
-        card.removeEventListener("mouseleave", () => {});
-      });
-      buttons.forEach((button) => {
-        button.removeEventListener("mouseenter", () => {});
-        button.removeEventListener("mouseleave", () => {});
-      });
-    };
-  }, []);
-
   return (
-    <div style={styles.container}>
+    <div
+      style={{
+        fontFamily: "'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+        background: "#f9fafb",
+        minHeight: "100vh",
+        boxSizing: "border-box",
+        width: "100%",
+      }}
+    >
       <GradientHeader />
 
-      <main style={styles.main}>
-        <section style={darkMode ? styles.sectionGray : styles.section}>
+      <main
+        style={{
+          padding: "5rem 1rem 2rem",
+          maxWidth: "1200px",
+          margin: "0 auto",
+          boxSizing: "border-box",
+          width: "100%",
+        }}
+      >
+        <section
+          style={{
+            padding: "2rem 0",
+            textAlign: "center",
+            width: "100%",
+          }}
+        >
           {/* Tabs */}
           <Tabs
             value={activeTab}
@@ -937,10 +1035,10 @@ const CombinedTracker = () => {
             variant="fullWidth"
             sx={{
               mb: 4,
-              background: darkMode ? "#2d2d2d" : "#f5f6f5",
+              background: "#f5f6f5",
               borderRadius: "8px",
               "& .MuiTabs-indicator": {
-                backgroundColor: themeColors.primary,
+                backgroundColor: "#4f46e5",
                 height: 3,
               },
             }}
@@ -949,7 +1047,7 @@ const CombinedTracker = () => {
               label="Budgets"
               icon={<Savings />}
               sx={{
-                color: activeTab === 0 ? themeColors.primary : (darkMode ? "#94a3b8" : "#666666"),
+                color: activeTab === 0 ? "#4f46e5" : "#6b7280",
                 textTransform: "none",
                 fontSize: "1rem",
                 fontWeight: 500,
@@ -959,7 +1057,7 @@ const CombinedTracker = () => {
               label="Transactions"
               icon={<Receipt />}
               sx={{
-                color: activeTab === 1 ? themeColors.primary : (darkMode ? "#94a3b8" : "#666666"),
+                color: activeTab === 1 ? "#4f46e5" : "#6b7280",
                 textTransform: "none",
                 fontSize: "1rem",
                 fontWeight: 500,
@@ -969,7 +1067,7 @@ const CombinedTracker = () => {
               label="Analytics"
               icon={<ShowChart />}
               sx={{
-                color: activeTab === 2 ? themeColors.primary : (darkMode ? "#94a3b8" : "#666666"),
+                color: activeTab === 2 ? "#4f46e5" : "#6b7280",
                 textTransform: "none",
                 fontSize: "1rem",
                 fontWeight: 500,
@@ -978,157 +1076,75 @@ const CombinedTracker = () => {
           </Tabs>
 
           {/* Summary Cards */}
-          <div style={styles.statsContainer}>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "1.5rem",
+              marginBottom: "2rem",
+              justifyContent: "center",
+            }}
+          >
             <SummaryCard
               title="Total Budget"
               value={summary.totalBudget}
-              color={themeColors.primary}
+              color="#4f46e5"
               icon={<Savings />}
             />
             <SummaryCard
               title="Total Spent"
               value={summary.totalSpent}
-              color={themeColors.error}
+              color="#ef4444"
               icon={<AttachMoney />}
             />
             <SummaryCard
               title="Remaining"
               value={summary.remainingBudget}
-              color={summary.remainingBudget >= 0 ? themeColors.success : themeColors.error}
+              color={summary.remainingBudget >= 0 ? "#10b981" : "#ef4444"}
               icon={<Savings />}
             />
           </div>
 
           {/* Budgets Tab */}
           <Box hidden={activeTab !== 0}>
-            <StyledCard className="summary-card">
-              <CardContent>
-                <Typography style={styles.sectionTitle}>
-                  {isEditing && editType === "budget" ? "Edit Budget" : "Create Budget"}
-                </Typography>
-                <form onSubmit={handleBudgetSubmit}>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        label="Amount"
-                        name="amount"
-                        type="number"
-                        value={budgetForm.amount}
-                        onChange={handleBudgetChange}
-                        required
-                        inputProps={{ min: 0, step: "0.01" }}
-                        InputLabelProps={{ style: styles.sectionSubtitle }}
-                        sx={{ "& .MuiInputBase-root": { borderRadius: "6px" } }}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <FormControl fullWidth>
-                        <InputLabel style={styles.sectionSubtitle}>Period</InputLabel>
-                        <Select
-                          name="period"
-                          value={budgetForm.period}
-                          onChange={handleBudgetChange}
-                          label="Period"
-                          required
-                          sx={{ borderRadius: "6px" }}
-                        >
-                          {periods.map((period) => (
-                            <MenuItem key={period} value={period}>
-                              {period.charAt(0) + period.slice(1).toLowerCase()}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        label="Start Date"
-                        name="startDate"
-                        type="date"
-                        value={budgetForm.startDate}
-                        onChange={handleBudgetChange}
-                        required
-                        InputLabelProps={{ shrink: true, style: styles.sectionSubtitle }}
-                        sx={{ "& .MuiInputBase-root": { borderRadius: "6px" } }}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        label="End Date"
-                        name="endDate"
-                        type="date"
-                        value={budgetForm.endDate}
-                        onChange={handleBudgetChange}
-                        required
-                        InputLabelProps={{ shrink: true, style: styles.sectionSubtitle }}
-                        sx={{ "& .MuiInputBase-root": { borderRadius: "6px" } }}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <FormControl fullWidth>
-                        <InputLabel style={styles.sectionSubtitle}>Category</InputLabel>
-                        <Select
-                          name="category"
-                          value={budgetForm.category}
-                          onChange={handleBudgetChange}
-                          label="Category"
-                          required
-                          sx={{ borderRadius: "6px" }}
-                        >
-                          {categories.map((cat) => (
-                            <MenuItem key={cat} value={cat}>
-                              {cat.charAt(0) + cat.slice(1).toLowerCase()}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    </Grid>
-                    <Grid item xs={12}>
-                      <div style={{ display: "flex", gap: "0.5rem" }}>
-                        <Button
-                          type="submit"
-                          variant="contained"
-                          style={styles.planButton}
-                          className="submit-button"
-                        >
-                          {isEditing ? "Update" : "Add"} Budget
-                        </Button>
-                        {isEditing && (
-                          <Button
-                            variant="outlined"
-                            style={styles.filterButton}
-                            onClick={resetForms}
-                            className="filter-button"
-                          >
-                            Cancel
-                          </Button>
-                        )}
-                      </div>
-                    </Grid>
-                  </Grid>
-                </form>
-              </CardContent>
-            </StyledCard>
-
-            {/* Budget Filters */}
-            <StyledCard className="summary-card" style={{ marginTop: "2rem" }}>
-              <CardContent>
-                <Typography style={styles.sectionTitle}>Budget Filters</Typography>
+            <StyledSection>
+              <Typography
+                style={{
+                  fontSize: "2rem",
+                  fontWeight: 700,
+                  color: "#1f2937",
+                  marginBottom: "1.5rem",
+                }}
+              >
+                {isEditing && editType === "budget" ? "Edit Budget" : "Create Budget"}
+              </Typography>
+              <form onSubmit={handleBudgetSubmit}>
                 <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6} md={4}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Amount"
+                      name="amount"
+                      type="number"
+                      value={budgetForm.amount}
+                      onChange={handleBudgetChange}
+                      required
+                      inputProps={{ min: 0, step: "0.01" }}
+                      InputLabelProps={{ style: { fontSize: "1rem", color: "#6b7280" } }}
+                      sx={{ "& .MuiInputBase-root": { borderRadius: "6px" } }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
                     <FormControl fullWidth>
-                      <InputLabel style={styles.sectionSubtitle}>Period</InputLabel>
+                      <InputLabel style={{ fontSize: "1rem", color: "#6b7280" }}>Period</InputLabel>
                       <Select
-                        name="budgetPeriod"
-                        value={filters.budgetPeriod}
-                        onChange={handleFilterChange}
+                        name="period"
+                        value={budgetForm.period}
+                        onChange={handleBudgetChange}
                         label="Period"
+                        required
                         sx={{ borderRadius: "6px" }}
                       >
-                        <MenuItem value="all">All Periods</MenuItem>
                         {periods.map((period) => (
                           <MenuItem key={period} value={period}>
                             {period.charAt(0) + period.slice(1).toLowerCase()}
@@ -1137,182 +1153,43 @@ const CombinedTracker = () => {
                       </Select>
                     </FormControl>
                   </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <Button
-                      fullWidth
-                      variant="outlined"
-                      startIcon={<FileDownload />}
-                      style={styles.filterButton}
-                      onClick={() => exportToCSV("budget")}
-                      className="filter-button"
-                    >
-                      Export CSV
-                    </Button>
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4}>
-                    <Button
-                      fullWidth
-                      variant="outlined"
-                      startIcon={<FileDownload />}
-                      style={styles.filterButton}
-                      onClick={() => exportToExcel("budget")}
-                      className="filter-button"
-                    >
-                      Export Excel
-                    </Button>
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </StyledCard>
-
-            {/* Budget List */}
-            <StyledCard className="summary-card" style={{ marginTop: "2rem" }}>
-              <CardContent>
-                <Typography style={styles.sectionTitle}>
-                  Your Budgets ({filteredBudgets.length})
-                </Typography>
-                {isLoadingBudgets ? (
-                  <LinearProgress />
-                ) : filteredBudgets.length === 0 ? (
-                  <Typography style={styles.noData}>
-                    No budgets found. Add a budget to start tracking.
-                  </Typography>
-                ) : (
-                  <Grid container spacing={3}>
-                    {filteredBudgets.map((budget) => (
-                      <Grid item xs={12} sm={6} md={4} key={budget.id}>
-                        <BudgetCard budget={budget} />
-                      </Grid>
-                    ))}
-                  </Grid>
-                )}
-              </CardContent>
-            </StyledCard>
-          </Box>
-
-          {/* Transactions Tab */}
-          <Box hidden={activeTab !== 1}>
-            <StyledCard className="summary-card">
-              <CardContent>
-                <Typography style={styles.sectionTitle}>
-                  {isEditing && editType === "transaction" ? "Edit Transaction" : "Add Transaction"}
-                </Typography>
-                <form onSubmit={handleTransactionSubmit}>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        label="Description"
-                        name="description"
-                        value={transactionForm.description}
-                        onChange={handleTransactionChange}
-                        required
-                        InputLabelProps={{ style: styles.sectionSubtitle }}
-                        sx={{ "& .MuiInputBase-root": { borderRadius: "6px" } }}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        label="Amount"
-                        name="amount"
-                        type="number"
-                        value={transactionForm.amount}
-                        onChange={handleTransactionChange}
-                        required
-                        inputProps={{ step: "0.01" }}
-                        InputLabelProps={{ style: styles.sectionSubtitle }}
-                        sx={{ "& .MuiInputBase-root": { borderRadius: "6px" } }}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        label="Date"
-                        name="transactionDate"
-                        type="date"
-                        value={transactionForm.transactionDate}
-                        onChange={handleTransactionChange}
-                        required
-                        InputLabelProps={{ shrink: true, style: styles.sectionSubtitle }}
-                        sx={{ "& .MuiInputBase-root": { borderRadius: "6px" } }}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <FormControl fullWidth>
-                        <InputLabel style={styles.sectionSubtitle}>Category</InputLabel>
-                        <Select
-                          name="category"
-                          value={transactionForm.category}
-                          onChange={handleTransactionChange}
-                          label="Category"
-                          required
-                          sx={{ borderRadius: "6px" }}
-                        >
-                          {categories.map((cat) => (
-                            <MenuItem key={cat} value={cat}>
-                              {cat.charAt(0) + cat.slice(1).toLowerCase()}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    </Grid>
-                    <Grid item xs={12}>
-                      <div style={{ display: "flex", gap: "0.5rem" }}>
-                        <Button
-                          type="submit"
-                          variant="contained"
-                          style={styles.planButton}
-                          className="submit-button"
-                        >
-                          {isEditing ? "Update" : "Add"} Transaction
-                        </Button>
-                        {isEditing && (
-                          <Button
-                            variant="outlined"
-                            style={styles.filterButton}
-                            onClick={resetForms}
-                            className="filter-button"
-                          >
-                            Cancel
-                          </Button>
-                        )}
-                      </div>
-                    </Grid>
-                  </Grid>
-                </form>
-              </CardContent>
-            </StyledCard>
-
-            {/* Transaction Filters */}
-            <StyledCard className="summary-card" style={{ marginTop: "2rem" }}>
-              <CardContent>
-                <Typography style={styles.sectionTitle}>Transaction Filters</Typography>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
-                      label="Search"
-                      name="search"
-                      value={filters.search}
-                      onChange={handleFilterChange}
-                      inputRef={searchInputRef}
-                      InputProps={{ startAdornment: <Search style={{ marginRight: "0.5rem" }} /> }}
-                      InputLabelProps={{ style: styles.sectionSubtitle }}
+                      label="Start Date"
+                      name="startDate"
+                      type="date"
+                      value={budgetForm.startDate}
+                      onChange={handleBudgetChange}
+                      required
+                      InputLabelProps={{ shrink: true, style: { fontSize: "1rem", color: "#6b7280" } }}
                       sx={{ "& .MuiInputBase-root": { borderRadius: "6px" } }}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="End Date"
+                      name="endDate"
+                      type="date"
+                      value={budgetForm.endDate}
+                      onChange={handleBudgetChange}
+                      required
+                      InputLabelProps={{ shrink: true, style: { fontSize: "1rem", color: "#6b7280" } }}
+                      sx={{ "& .MuiInputBase-root": { borderRadius: "6px" } }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
                     <FormControl fullWidth>
-                      <InputLabel style={styles.sectionSubtitle}>Category</InputLabel>
+                      <InputLabel style={{ fontSize: "1rem", color: "#6b7280" }}>Category</InputLabel>
                       <Select
                         name="category"
-                        value={filters.category}
-                        onChange={handleFilterChange}
+                        value={budgetForm.category}
+                        onChange={handleBudgetChange}
                         label="Category"
+                        required
                         sx={{ borderRadius: "6px" }}
                       >
-                        <MenuItem value="all">All Categories</MenuItem>
                         {categories.map((cat) => (
                           <MenuItem key={cat} value={cat}>
                             {cat.charAt(0) + cat.slice(1).toLowerCase()}
@@ -1321,679 +1198,759 @@ const CombinedTracker = () => {
                       </Select>
                     </FormControl>
                   </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid item xs={12}>
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <Button
+                        type="submit"
+                        variant="contained"
+                        style={{
+                          background: "#4f46e5",
+                          color: "#ffffff",
+                          padding: "0.75rem 1.5rem",
+                          borderRadius: "6px",
+                          fontSize: "1rem",
+                          fontWeight: 500,
+                          transition: "background 0.3s, transform 0.3s",
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "#4338ca")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "#4f46e5")}
+                      >
+                        {isEditing ? "Update" : "Add"} Budget
+                      </Button>
+                      {isEditing && (
+                        <Button
+                          variant="outlined"
+                          style={{
+                            border: "1px solid #4f46e5",
+                            color: "#4f46e5",
+                            padding: "0.5rem 1rem",
+                            borderRadius: "6px",
+                            fontSize: "0.9rem",
+                            fontWeight: 500,
+                            transition: "background 0.3s, transform 0.3s",
+                          }}
+                          onClick={resetForms}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f6f5")}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                        >
+                          Cancel
+                        </Button>
+                      )}
+                    </div>
+                  </Grid>
+                </Grid>
+              </form>
+            </StyledSection>
+
+            {/* Budget Filters */}
+            <StyledSection>
+              <Typography
+                style={{
+                  fontSize: "2rem",
+                  fontWeight: 700,
+                  color: "#1f2937",
+                  marginBottom: "1.5rem",
+                }}
+              >
+                Budget Filters
+              </Typography>
+              <Grid container spacing={2}>
+               <Grid item xs={12} sm={6} md={4}>
+  <FormControl fullWidth>
+    <InputLabel style={{ fontSize: "1rem", color: "#6b7280" }}>Period</InputLabel>
+    <Select
+      name="budgetPeriod"
+      value={filters.budgetPeriod}
+      onChange={handleFilterChange}
+      label="Period"
+      sx={{ borderRadius: "6px" }}
+    >
+      <MenuItem value="all">All Periods</MenuItem>
+      {periods.map((period) => (
+        <MenuItem key={period} value={period}>
+          {period.charAt(0) + period.slice(1).toLowerCase()}
+        </MenuItem>
+      ))}
+    </Select>
+  </FormControl>
+</Grid>
+                <Grid item xs={12} sm={6} md={4}>
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    startIcon={<FileDownload />}
+                    style={{
+                      border: "1px solid #4f46e5",
+                      color: "#4f46e5",
+                      padding: "0.5rem 1rem",
+                      borderRadius: "6px",
+                      fontSize: "0.9rem",
+                      fontWeight: 500,
+                      transition: "background 0.3s, transform 0.3s",
+                    }}
+                    onClick={() => exportToCSV("budget")}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f6f5")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  >
+                    Export CSV
+                  </Button>
+                </Grid>
+                <Grid item xs={12} sm={6} md={4}>
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    startIcon={<FileDownload />}
+                    style={{
+                      border: "1px solid #4f46e5",
+                      color: "#4f46e5",
+                      padding: "0.5rem 1rem",
+                      borderRadius: "6px",
+                      fontSize: "0.9rem",
+                      fontWeight: 500,
+                      transition: "background 0.3s, transform 0.3s",
+                    }}
+                    onClick={() => exportToExcel("budget")}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f6f5")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  >
+                    Export Excel
+                  </Button>
+                </Grid>
+              </Grid>
+            </StyledSection>
+
+            {/* Budget List */}
+            <StyledSection>
+              <Typography
+                style={{
+                  fontSize: "2rem",
+                  fontWeight: 700,
+                  color: "#1f2937",
+                  marginBottom: "1.5rem",
+                }}
+              >
+                Your Budgets ({filteredBudgets.length})
+              </Typography>
+              {isLoadingBudgets ? (
+                <LinearProgress />
+              ) : filteredBudgets.length === 0 ? (
+                <Typography
+                  style={{
+                    fontSize: "1rem",
+                    color: "#6b7280",
+                    textAlign: "center",
+                    padding: "2rem",
+                  }}
+                >
+                  No budgets found. Add a budget to start tracking.
+                </Typography>
+              ) : (
+                <Grid container spacing={3}>
+                  {filteredBudgets.map((budget) => (
+                    <Grid item xs={12} sm={6} md={4} key={budget.id}>
+                      <BudgetCard budget={budget} />
+                    </Grid>
+                  ))}
+                </Grid>
+              )}
+            </StyledSection>
+          </Box>
+
+          {/* Transactions Tab */}
+          <Box hidden={activeTab !== 1}>
+            <StyledSection>
+              <Typography
+                style={{
+                  fontSize: "2rem",
+                  fontWeight: 700,
+                  color: "#1f2937",
+                  marginBottom: "1.5rem",
+                }}
+              >
+                {isEditing && editType === "transaction" ? "Edit Transaction" : "Add Transaction"}
+              </Typography>
+              <form onSubmit={handleTransactionSubmit}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
-                      label="From Date"
-                      name="fromDate"
-                      type="date"
-                      value={filters.fromDate}
-                      onChange={handleFilterChange}
-                      InputLabelProps={{ shrink: true, style: styles.sectionSubtitle }}
+                      label="Description"
+                      name="description"
+                      value={transactionForm.description}
+                      onChange={handleTransactionChange}
+                      required
+                      InputLabelProps={{ style: { fontSize: "1rem", color: "#6b7280" } }}
                       sx={{ "& .MuiInputBase-root": { borderRadius: "6px" } }}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
-                      label="To Date"
-                      name="toDate"
-                      type="date"
-                      value={filters.toDate}
-                      onChange={handleFilterChange}
-                      InputLabelProps={{ shrink: true, style: styles.sectionSubtitle }}
+                      label="Amount"
+                      name="amount"
+                      type="number"
+                      value={transactionForm.amount}
+                      onChange={handleTransactionChange}
+                      required
+                      inputProps={{ step: "0.01" }}
+                      InputLabelProps={{ style: { fontSize: "1rem", color: "#6b7280" } }}
                       sx={{ "& .MuiInputBase-root": { borderRadius: "6px" } }}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Button
+                  <Grid item xs={12} sm={6}>
+                    <TextField
                       fullWidth
-                      variant="outlined"
-                      startIcon={<FileDownload />}
-                      style={styles.filterButton}
-                      onClick={() => exportToCSV("transaction")}
-                      className="filter-button"
-                    >
-                      Export CSV
-                    </Button>
+                      label="Date"
+                      name="transactionDate"
+                      type="date"
+                      value={transactionForm.transactionDate}
+                      onChange={handleTransactionChange}
+                      required
+                      InputLabelProps={{ shrink: true, style: { fontSize: "1rem", color: "#6b7280" } }}
+                      sx={{ "& .MuiInputBase-root": { borderRadius: "6px" } }}
+                    />
                   </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Button
-                      fullWidth
-                      variant="outlined"
-                      startIcon={<FileDownload />}
-                      style={styles.filterButton}
-                      onClick={() => exportToExcel("transaction")}
-                      className="filter-button"
-                    >
-                      Export Excel
-                    </Button>
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                      <InputLabel style={{ fontSize: "1rem", color: "#6b7280" }}>Category</InputLabel>
+                      <Select
+                        name="category"
+                        value={transactionForm.category}
+                        onChange={handleTransactionChange}
+                        label="Category"
+                        required
+                        sx={{ borderRadius: "6px" }}
+                      >
+                        {categories.map((cat) => (
+                          <MenuItem key={cat} value={cat}>
+                            {cat.charAt(0) + cat.slice(1).toLowerCase()}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
                   </Grid>
-                  <Grid item xs={12} sm={6} md={3}>
+                  <Grid item xs={12}>
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <Button
+                        type="submit"
+                        variant="contained"
+                        style={{
+                          background: "#4f46e5",
+                          color: "#ffffff",
+                          padding: "0.75rem 1.5rem",
+                          borderRadius: "6px",
+                          fontSize: "1rem",
+                          fontWeight: 500,
+                          transition: "background 0.3s, transform 0.3s",
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "#4338ca")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "#4f46e5")}
+                      >
+                        {isEditing ? "Update" : "Add"} Transaction
+                      </Button>
+                      {isEditing && (
+                        <Button
+                          variant="outlined"
+                          style={{
+                            border: "1px solid #4f46e5",
+                            color: "#4f46e5",
+                            padding: "0.5rem 1rem",
+                            borderRadius: "6px",
+                            fontSize: "0.9rem",
+                            fontWeight: 500,
+                            transition: "background 0.3s, transform 0.3s",
+                          }}
+                          onClick={resetForms}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f6f5")}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                        >
+                          Cancel
+                        </Button>
+                      )}
+                    </div>
+                  </Grid>
+                </Grid>
+              </form>
+            </StyledSection>
+
+            {/* Transaction Filters */}
+            <StyledSection>
+              <Typography
+                style={{
+                  fontSize: "2rem",
+                  fontWeight: 700,
+                  color: "#1f2937",
+                  marginBottom: "1.5rem",
+                }}
+              >
+                Transaction Filters
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    label="Search"
+                    name="search"
+                    value={filters.search}
+                    onChange={handleFilterChange}
+                    inputRef={searchInputRef}
+                    InputProps={{ startAdornment: <Search style={{ marginRight: "0.5rem" }} /> }}
+                    InputLabelProps={{ style: { fontSize: "1rem", color: "#6b7280" } }}
+                    sx={{ "& .MuiInputBase-root": { borderRadius: "6px" } }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <FormControl fullWidth>
+                    <InputLabel style={{ fontSize: "1rem", color: "#6b7280" }}>Category</InputLabel>
+                    <Select
+                      name="category"
+                      value={filters.category}
+                      onChange={handleFilterChange}
+                      label="Category"
+                      sx={{ borderRadius: "6px" }}
+                    >
+                      <MenuItem value="all">All Categories</MenuItem>
+                      {categories.map((cat) => (
+                        <MenuItem key={cat} value={cat}>
+                          {cat.charAt(0) + cat.slice(1).toLowerCase()}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    label="From Date"
+                    name="fromDate"
+                    type="date"
+                    value={filters.fromDate}
+                    onChange={handleFilterChange}
+                    InputLabelProps={{ shrink: true, style: { fontSize: "1rem", color: "#6b7280" } }}
+                    sx={{ "& .MuiInputBase-root": { borderRadius: "6px" } }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    label="To Date"
+                    name="toDate"
+                    type="date"
+                    value={filters.toDate}
+                    onChange={handleFilterChange}
+                    InputLabelProps={{ shrink: true, style: { fontSize: "1rem", color: "#6b7280" } }}
+                    sx={{ "& .MuiInputBase-root": { borderRadius: "6px" } }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    label="Min Amount"
+                    name="minAmount"
+                    type="number"
+                    value={filters.minAmount}
+                    onChange={handleFilterChange}
+                    inputProps={{ step: "0.01" }}
+                    InputLabelProps={{ style: { fontSize: "1rem", color: "#6b7280" } }}
+                    sx={{ "& .MuiInputBase-root": { borderRadius: "6px" } }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <TextField
+                    fullWidth
+                    label="Max Amount"
+                    name="maxAmount"
+                    type="number"
+                    value={filters.maxAmount}
+                    onChange={handleFilterChange}
+                    inputProps={{ step: "0.01" }}
+                    InputLabelProps={{ style: { fontSize: "1rem", color: "#6b7280" } }}
+                    sx={{ "& .MuiInputBase-root": { borderRadius: "6px" } }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <FormControl fullWidth>
+                    <InputLabel style={{ fontSize: "1rem", color: "#6b7280" }}>Sort By</InputLabel>
+                    <Select
+                      name="sortBy"
+                      value={filters.sortBy}
+                      onChange={handleFilterChange}
+                      label="Sort By"
+                      sx={{ borderRadius: "6px" }}
+                    >
+                      <MenuItem value="date">Date</MenuItem>
+                      <MenuItem value="amount">Amount</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <FormControl fullWidth>
+                    <InputLabel style={{ fontSize: "1rem", color: "#6b7280" }}>Order</InputLabel>
+                    <Select
+                      name="sortOrder"
+                      value={filters.sortOrder}
+                      onChange={handleFilterChange}
+                      label="Order"
+                      sx={{ borderRadius: "6px" }}
+                    >
+                      <MenuItem value="desc">Descending</MenuItem>
+                      <MenuItem value="asc">Ascending</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12}>
+                  <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
                     <Button
-                      fullWidth
                       variant="outlined"
-                      style={styles.filterButton}
+                      style={{
+                        border: "1px solid #4f46e5",
+                        color: "#4f46e5",
+                        padding: "0.5rem 1rem",
+                        borderRadius: "6px",
+                        fontSize: "0.9rem",
+                        fontWeight: 500,
+                        transition: "background 0.3s, transform 0.3s",
+                      }}
                       onClick={resetFilters}
-                      className="filter-button"
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f6f5")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                     >
                       Reset Filters
                     </Button>
-                  </Grid>
+                    <Button
+                      variant="outlined"
+                      startIcon={<FileDownload />}
+                      style={{
+                        border: "1px solid #4f46e5",
+                        color: "#4f46e5",
+                        padding: "0.5rem 1rem",
+                        borderRadius: "6px",
+                        fontSize: "0.9rem",
+                        fontWeight: 500,
+                        transition: "background 0.3s, transform 0.3s",
+                      }}
+                      onClick={() => exportToCSV("transaction")}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f6f5")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    >
+                      Export CSV
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      startIcon={<FileDownload />}
+                      style={{
+                        border: "1px solid #4f46e5",
+                        color: "#4f46e5",
+                        padding: "0.5rem 1rem",
+                        borderRadius: "6px",
+                        fontSize: "0.9rem",
+                        fontWeight: 500,
+                        transition: "background 0.3s, transform 0.3s",
+                      }}
+                      onClick={() => exportToExcel("transaction")}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f6f5")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    >
+                      Export Excel
+                    </Button>
+                  </div>
                 </Grid>
-              </CardContent>
-            </StyledCard>
+              </Grid>
+            </StyledSection>
 
-            {/* Transactions List */}
-            <StyledCard className="table-container" style={{ marginTop: "2rem" }}>
-              <CardContent>
-                <Typography style={styles.sectionTitle}>
-                  Transactions ({filteredTransactions.length})
+            {/* Transaction List */}
+            <StyledSection>
+              <Typography
+                style={{
+                  fontSize: "2rem",
+                  fontWeight: 700,
+                  color: "#1f2937",
+                  marginBottom: "1.5rem",
+                }}
+              >
+                Your Transactions ({filteredTransactions.length})
+              </Typography>
+              {filteredTransactions.length === 0 ? (
+                <Typography
+                  style={{
+                    fontSize: "1rem",
+                    color: "#6b7280",
+                    textAlign: "center",
+                    padding: "2rem",
+                  }}
+                >
+                  No transactions found. Add a transaction to start tracking.
                 </Typography>
-                <TableContainer component={Paper} style={styles.tableContainer}>
-                  <Table aria-label="Transactions table" style={styles.table}>
-                    <TableHead style={styles.tableHeader}>
+              ) : (
+                <TableContainer component={Paper} style={{ borderRadius: "8px", overflowX: "auto" }}>
+                  <Table>
+                    <TableHead>
                       <TableRow>
-                        <TableCell style={styles.tableCell}>Description</TableCell>
-                        <TableCell align="right" style={styles.tableCell}>Amount</TableCell>
-                        <TableCell style={styles.tableCell}>Category</TableCell>
-                        <TableCell style={styles.tableCell}>Actions</TableCell>
+                        <TableCell style={{ fontWeight: 600, color: "#1f2937" }}>Description</TableCell>
+                        <TableCell align="right" style={{ fontWeight: 600, color: "#1f2937" }}>Amount</TableCell>
+                        <TableCell style={{ fontWeight: 600, color: "#1f2937" }}>Category</TableCell>
+                        <TableCell style={{ fontWeight: 600, color: "#1f2937" }}>Actions</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {filteredTransactions.length > 0 ? (
-                        filteredTransactions.map((txn) => (
-                          <TransactionRow key={txn.id} txn={txn} />
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={4} align="center" style={styles.noData}>
-                            No transactions found
-                          </TableCell>
-                        </TableRow>
-                      )}
+                      {filteredTransactions.map((txn) => (
+                        <TransactionRow key={txn.id} txn={txn} />
+                      ))}
                     </TableBody>
                   </Table>
                 </TableContainer>
-              </CardContent>
-            </StyledCard>
+              )}
+            </StyledSection>
           </Box>
 
           {/* Analytics Tab */}
           <Box hidden={activeTab !== 2}>
-            <Grid container spacing={3} className="summary-card" key={updateKey}>
-              {/* Budget Utilization Summary */}
-              <Grid item xs={12}>
-                <StyledCard>
-                  <CardContent>
-                    <Typography style={styles.sectionTitle}>Budget Utilization Overview</Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} sm={4}>
-                        <Typography style={styles.sectionSubtitle}>Percentage Spent</Typography>
-                        <Typography
-                          style={{
-                            ...styles.statValue,
-                            color: summary.percentSpent > 90 ? themeColors.error : themeColors.primary,
-                          }}
-                        >
-                          {summary.percentSpent.toFixed(1)}%
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} sm={4}>
-                        <Typography style={styles.sectionSubtitle}>Remaining Budget</Typography>
-                        <Typography
-                          style={{
-                            ...styles.statValue,
-                            color: summary.remainingBudget >= 0 ? themeColors.success : themeColors.error,
-                          }}
-                        >
-                          ₹{Math.abs(summary.remainingBudget).toFixed(2)}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} sm={4}>
-                        <Typography style={styles.sectionSubtitle}>Total Savings (Historical)</Typography>
-                        <Typography style={{ ...styles.statValue, color: themeColors.success }}>
-                          ₹{summary.totalSavings.toFixed(2)}
-                        </Typography>
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </StyledCard>
-              </Grid>
-
-              {/* Category-Wise Budget Insights */}
-              <Grid item xs={12}>
-                <StyledCard className="table-container">
-                  <CardContent>
-                    <Typography style={styles.sectionTitle}>Category-Wise Budget Insights</Typography>
-                    {isLoadingBudgets && <LinearProgress />}
-                    {budgets.length === 0 && !isLoadingBudgets && (
-                      <Typography style={styles.noData}>
-                        No budgets added. Add budgets in the Budgets tab to see insights.
-                      </Typography>
-                    )}
-                    <TableContainer component={Paper} style={styles.tableContainer}>
-                      <Table aria-label="Category budget insights table" style={styles.table}>
-                        <TableHead style={styles.tableHeader}>
-                          <TableRow>
-                            <TableCell style={styles.tableCell}>Category</TableCell>
-                            <TableCell align="right" style={styles.tableCell}>Budget</TableCell>
-                            <TableCell align="right" style={styles.tableCell}>Spent</TableCell>
-                            <TableCell align="right" style={styles.tableCell}>Remaining</TableCell>
-                            <TableCell align="right" style={styles.tableCell}>% Spent</TableCell>
-                            <TableCell align="right" style={styles.tableCell}>Avg. Transaction</TableCell>
-                            <TableCell style={styles.tableCell}>Status</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {categories.map((cat) => {
-                            const details = summary.categoryBudgetDetails[cat] || {};
-                            const hasBudget = details.totalBudget > 0;
-                            return (
-                              <TableRow key={cat} style={styles.tableRow}>
-                                <TableCell style={styles.tableCell}>
-                                  {cat.charAt(0) + cat.slice(1).toLowerCase()}
-                                </TableCell>
-                                <TableCell align="right" style={styles.tableCell}>
-                                  {hasBudget ? `₹${details.totalBudget.toFixed(2)}` : "N/A"}
-                                </TableCell>
-                                <TableCell align="right" style={styles.tableCell}>
-                                  ₹{details.totalSpent?.toFixed(2) || "0.00"}
-                                </TableCell>
-                                <TableCell align="right" style={styles.tableCell}>
-                                  <span
-                                    style={{
-                                      color: details.remainingBudget >= 0 ? themeColors.success : themeColors.error,
-                                    }}
-                                  >
-                                    {hasBudget
-                                      ? `₹${Math.abs(details.remainingBudget).toFixed(2)}`
-                                      : "N/A"}
-                                  </span>
-                                </TableCell>
-                                <TableCell align="right" style={styles.tableCell}>
-                                  {hasBudget ? `${details.percentSpent.toFixed(1)}%` : "N/A"}
-                                </TableCell>
-                                <TableCell align="right" style={styles.tableCell}>
-                                  {details.transactionCount > 0
-                                    ? `₹${details.avgSpendingPerTransaction.toFixed(2)}`
-                                    : "N/A"}
-                                </TableCell>
-                                <TableCell style={styles.tableCell}>
-                                  <Chip
-                                    label={
-                                      !hasBudget && details.totalSpent > 0
-                                        ? "No Budget"
-                                        : details.percentSpent > 100
-                                        ? "Overspent"
-                                        : details.percentSpent > 80
-                                        ? "Warning"
-                                        : "On Track"
-                                    }
-                                    color={
-                                      !hasBudget && details.totalSpent > 0
-                                        ? "error"
-                                        : details.percentSpent > 100
-                                        ? "error"
-                                        : details.percentSpent > 80
-                                        ? "warning"
-                                        : "success"
-                                    }
-                                    size="small"
-                                    style={{ fontSize: "0.75rem" }}
-                                  />
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  </CardContent>
-                </StyledCard>
-              </Grid>
-
-              {/* Spending by Category */}
-              <Grid item xs={12} md={6}>
-                <StyledCard>
-                  <CardContent>
-                    <Typography style={styles.sectionTitle}>Spending by Category</Typography>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={categoryChartData}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          fill="#8884d8"
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        >
-                          {categoryChartData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value) => [`₹${value}`, "Amount"]} />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </StyledCard>
-              </Grid>
-
-              {/* Monthly Spending */}
-              <Grid item xs={12} md={6}>
-                <StyledCard>
-                  <CardContent>
-                    <Typography style={styles.sectionTitle}>Monthly Spending</Typography>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={monthlyChartData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis />
-                        <Tooltip formatter={(value) => [`₹${value}`, "Amount"]} />
-                        <Legend />
-                        <Bar dataKey="income" fill="#4CAF50" name="Income" />
-                        <Bar dataKey="expense" fill="#F44336" name="Expense" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </StyledCard>
-              </Grid>
-
-              {/* Budget vs Actual Spending */}
-              {budgets.length > 0 && (
-                <Grid item xs={12}>
-                  <StyledCard>
-                    <CardContent>
-                      <Typography style={styles.sectionTitle}>Budget vs Actual Spending</Typography>
-                      <ResponsiveContainer width="100%" height={400}>
-                        <BarChart data={budgetVsActualData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="name" />
-                          <YAxis />
-                          <Tooltip />
-                          <Legend />
-                          <Bar dataKey="budget" fill="#8884d8" name="Budget" />
-                          <Bar dataKey="actual" fill="#82ca9d" name="Actual" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </StyledCard>
-                </Grid>
-              )}
-
-              {/* Savings Trend */}
-              {savingsTrendData.length > 0 && (
-                <Grid item xs={12}>
-                  <StyledCard>
-                    <CardContent>
-                      <Typography style={styles.sectionTitle}>Savings Trend Over Time</Typography>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={savingsTrendData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="month" />
-                          <YAxis />
-                          <Tooltip formatter={(value) => [`₹${value}`, "Savings"]} />
-                          <Legend />
-                          <Line type="monotone" dataKey="savings" stroke="#34d399" name="Savings" />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </StyledCard>
-                </Grid>
-              )}
-
-              {/* Historical Savings */}
-              {savingsHistory.length > 0 && (
-                <Grid item xs={12}>
-                  <StyledCard className="table-container">
-                    <CardContent>
-                      <Typography style={styles.sectionTitle}>Historical Savings</Typography>
-                      <TableContainer component={Paper} style={styles.tableContainer}>
-                        <Table aria-label="Historical savings table" style={styles.table}>
-                          <TableHead style={styles.tableHeader}>
-                            <TableRow>
-                              <TableCell style={styles.tableCell}>Category</TableCell>
-                              <TableCell style={styles.tableCell}>Period</TableCell>
-                              <TableCell align="right" style={styles.tableCell}>Savings</TableCell>
-                              <TableCell style={styles.tableCell}>End Date</TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {savingsHistory.map((item) => (
-                              <TableRow key={item.id} style={styles.tableRow}>
-                                <TableCell style={styles.tableCell}>
-                                  {item.category.charAt(0) + item.category.slice(1).toLowerCase()}
-                                </TableCell>
-                                <TableCell style={styles.tableCell}>
-                                  {item.period.charAt(0) + item.period.slice(1).toLowerCase()}
-                                </TableCell>
-                                <TableCell align="right" style={styles.tableCell}>
-                                  ₹{item.savings.toFixed(2)}
-                                </TableCell>
-                                <TableCell style={styles.tableCell}>{item.endDate}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </TableContainer>
-                    </CardContent>
-                  </StyledCard>
-                </Grid>
-              )}
-            </Grid>
-          </Box>
-
-          {/* Delete Confirmation Dialog */}
-          <Dialog
-            open={openDeleteDialog}
-            onClose={() => setOpenDeleteDialog(false)}
-            aria-labelledby="delete-dialog-title"
-            aria-describedby="delete-dialog-description"
-            sx={{ zIndex: 1300 }}
-          >
-            <DialogTitle id="delete-dialog-title" style={styles.sectionTitle}>
-              Confirm Delete
-            </DialogTitle>
-            <DialogContent>
-              <Typography style={styles.sectionSubtitle}>
-                Are you sure you want to delete this {itemToDelete?.type}?
+            <StyledSection>
+              <Typography
+                style={{
+                  fontSize: "2rem",
+                  fontWeight: 700,
+                  color: "#1f2937",
+                  marginBottom: "1.5rem",
+                }}
+              >
+                Spending by Category
               </Typography>
-              {itemToDelete && (
-                <Typography style={{ marginTop: "0.5rem", color: themeColors.text }}>
-                  {itemToDelete.type === "budget" ? (
-                    <>
-                      <strong>{itemToDelete.period.charAt(0) + itemToDelete.period.slice(1).toLowerCase()} Budget</strong> - ₹
-                      {itemToDelete.amount} (Spent: ₹{itemToDelete.spent})
-                    </>
-                  ) : (
-                    <>
-                      <strong>{itemToDelete.description}</strong> - ₹{itemToDelete.amount} (
-                      {itemToDelete.category.charAt(0) + itemToDelete.category.slice(1).toLowerCase()})
-                    </>
-                  )}
-                </Typography>
-              )}
-            </DialogContent>
-            <DialogActions>
-              <Button
-                onClick={() => setOpenDeleteDialog(false)}
-                style={styles.filterButton}
-                className="filter-button"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleDelete}
-                style={{ ...styles.deleteButton, background: themeColors.error }}
-                className="delete-button"
-              >
-                Delete
-              </Button>
-            </DialogActions>
-          </Dialog>
+              <div style={{ height: "400px", width: "100%", marginBottom: "2rem" }}>
+                <ResponsiveContainer>
+                  <PieChart>
+                    <Pie
+                      data={categoryChartData}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius="80%"
+                      fill="#8884d8"
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                    >
+                      {categoryChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => `₹${value.toFixed(2)}`} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </StyledSection>
 
-          {/* Snackbar Notifications */}
-          <Snackbar
-            open={openSnackbar}
-            autoHideDuration={3000}
-            onClose={() => setOpenSnackbar(false)}
-            anchorOrigin={{ vertical: "top", horizontal: "right" }}
-          >
-            <Alert
-              onClose={() => setOpenSnackbar(false)}
-              severity={snackbarSeverity}
-              variant="filled"
-              style={{ background: snackbarSeverity === "success" ? "#10b981" : "#ef4444" }}
-            >
-              {snackbarMessage}
-            </Alert>
-          </Snackbar>
+            <StyledSection>
+              <Typography
+                style={{
+                  fontSize: "2rem",
+                  fontWeight: 700,
+                  color: "#1f2937",
+                  marginBottom: "1.5rem",
+                }}
+              >
+                Monthly Spending
+              </Typography>
+              <div style={{ height: "400px", width: "100%", marginBottom: "2rem" }}>
+                <ResponsiveContainer>
+                  <BarChart data={monthlyChartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip formatter={(value) => `₹${value.toFixed(2)}`} />
+                    <Legend />
+                    <Bar dataKey="income" fill="#4f46e5" />
+                    <Bar dataKey="expense" fill="#ef4444" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </StyledSection>
 
-          {/* Undo Delete Snackbar */}
-          {deletedItem && (
-            <Snackbar
-              open={!!deletedItem}
-              autoHideDuration={6000}
-              onClose={() => setDeletedItem(null)}
-              anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-            >
-              <Alert
-                onClose={() => setDeletedItem(null)}
-                severity="info"
-                style={{ background: "#00c4b4" }}
-                action={
-                  <Button
-                    color="inherit"
-                    size="small"
-                    onClick={undoDelete}
-                    style={{ color: "#ffffff" }}
-                    className="action-button"
+            <StyledSection>
+              <Typography
+                style={{
+                  fontSize: "2rem",
+                  fontWeight: 700,
+                  color: "#1f2937",
+                  marginBottom: "1.5rem",
+                }}
+              >
+                Budget vs Actual
+              </Typography>
+              <div style={{ height: "400px", width: "100%", marginBottom: "2rem" }}>
+                <ResponsiveContainer>
+                  <BarChart data={budgetVsActualData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip formatter={(value) => `₹${value.toFixed(2)}`} />
+                    <Legend />
+                    <Bar dataKey="budget" fill="#4f46e5" />
+                    <Bar dataKey="actual" fill="#2dd4bf" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </StyledSection>
+
+            <StyledSection>
+              <Typography
+                style={{
+                  fontSize: "2rem",
+                  fontWeight: 700,
+                  color: "#1f2937",
+                  marginBottom: "1.5rem",
+                }}
+              >
+                Savings Trend
+              </Typography>
+              <div style={{ height: "400px", width: "100%", marginBottom: "2rem" }}>
+                <ResponsiveContainer>
+                  <LineChart data={savingsTrendData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip formatter={(value) => `₹${value.toFixed(2)}`} />
+                    <Legend />
+                    <Line type="monotone" dataKey="savings" stroke="#10b981" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </StyledSection>
+
+            <StyledSection>
+              <Typography
+                style={{
+                  fontSize: "2rem",
+                  fontWeight: 700,
+                  color: "#1f2937",
+                  marginBottom: "1.5rem",
+                }}
+              >
+                Summary Statistics
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6} md={4}>
+                  <Typography
+                    style={{
+                      fontSize: "1.2rem",
+                      fontWeight: 600,
+                      color: "#4b5563",
+                    }}
                   >
-                    UNDO
-                  </Button>
-                }
-              >
-                {deletedItem.type === "budget" ? "Budget" : "Transaction"} deleted
-              </Alert>
-            </Snackbar>
-          )}
+                    Total Savings
+                  </Typography>
+                  <Typography
+                    style={{
+                      fontSize: "1.5rem",
+                      fontWeight: 700,
+                      color: "#10b981",
+                    }}
+                  >
+                    ₹{summary.totalSavings.toFixed(2)}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} sm={6} md={4}>
+                  <Typography
+                    style={{
+                      fontSize: "1.2rem",
+                      fontWeight: 600,
+                      color: "#4b5563",
+                    }}
+                  >
+                    Largest Transaction
+                  </Typography>
+                  <Typography
+                    style={{
+                      fontSize: "1.5rem",
+                      fontWeight: 700,
+                      color: "#4f46e5",
+                    }}
+                  >
+                    ₹{summary.largestTransaction.toFixed(2)}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} sm={6} md={4}>
+                  <Typography
+                    style={{
+                      fontSize: "1.2rem",
+                      fontWeight: 600,
+                      color: "#4b5563",
+                    }}
+                  >
+                    Most Frequent Category
+                  </Typography>
+                  <Typography
+                    style={{
+                      fontSize: "1.5rem",
+                      fontWeight: 700,
+                      color: "#2dd4bf",
+                    }}
+                  >
+                    {summary.frequentCategory}
+                  </Typography>
+                </Grid>
+              </Grid>
+            </StyledSection>
+          </Box>
         </section>
       </main>
 
-      <footer style={styles.footer}>
-        <p style={styles.footerText}>© 2025 ExpenseMate. All rights reserved.</p>
-        <div style={styles.footerLinks}>
-          <a href="/privacy" style={styles.footerLink}>Privacy Policy</a>
-          <a href="/terms" style={styles.footerLink}>Terms of Service</a>
-          <a href="/contact" style={styles.footerLink}>Contact Us</a>
-        </div>
-      </footer>
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={openDeleteDialog}
+        onClose={() => setOpenDeleteDialog(false)}
+        aria-labelledby="delete-dialog-title"
+      >
+        <DialogTitle id="delete-dialog-title">
+          Confirm Delete
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete this {itemToDelete?.type}?
+          </Typography>
+          {itemToDelete?.type === "budget" && (
+            <Typography style={{ marginTop: "0.5rem", color: "#6b7280" }}>
+              Category: {itemToDelete.category}
+            </Typography>
+          )}
+          {itemToDelete?.type === "transaction" && (
+            <Typography style={{ marginTop: "0.5rem", color: "#6b7280" }}>
+              Description: {itemToDelete.description}
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setOpenDeleteDialog(false)}
+            style={{
+              color: "#6b7280",
+              padding: "0.5rem 1rem",
+              borderRadius: "6px",
+              fontSize: "0.9rem",
+              fontWeight: 500,
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDelete}
+            style={{
+              background: "#ef4444",
+              color: "#ffffff",
+              padding: "0.5rem 1rem",
+              borderRadius: "6px",
+              fontSize: "0.9rem",
+              fontWeight: 500,
+              transition: "background 0.3s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "#dc2626")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "#ef4444")}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };
 
-// Styles object inspired by Subscription.js
-const styles = {
-  container: {
-    fontFamily: "'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif",
-    background: "#ffffff",
-    minHeight: "100vh",
-    boxSizing: "border-box",
-  },
-  header: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    background: "#0f2b5b",
-    padding: "1rem 1.5rem",
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-    boxSizing: "border-box",
-    maxWidth: "100vw",
-    overflow: "hidden",
-  },
-  logo: {
-    display: "flex",
-    alignItems: "center",
-    flexShrink: 0,
-  },
-  logoText: {
-    fontSize: "1.5rem",
-    fontWeight: 700,
-    background: "linear-gradient(90deg, #4f46e5, #00c4b4)",
-    WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
-    whiteSpace: "nowrap",
-  },
-  logoutButton: {
-    background: "#00c4b4",
-    color: "#ffffff",
-    border: "none",
-    padding: "0.5rem 1rem",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontSize: "0.9rem",
-    fontWeight: 500,
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-    transition: "background 0.3s, transform 0.3s",
-    flexShrink: 0,
-    whiteSpace: "nowrap",
-  },
-  main: {
-    padding: "5rem 1rem 2rem",
-    maxWidth: "1200px",
-    margin: "0 auto",
-    boxSizing: "border-box",
-  },
-  section: {
-    padding: "3rem 0",
-    textAlign: "center",
-  },
-  sectionGray: {
-    padding: "3rem 0",
-    background: "#1a1b1e",
-    textAlign: "center",
-  },
-  sectionTitle: {
-    fontSize: "2rem",
-    fontWeight: 700,
-    color: "#333333",
-    marginBottom: "1.5rem",
-  },
-  sectionSubtitle: {
-    fontSize: "1rem",
-    fontWeight: 400,
-    color: "#666666",
-    marginBottom: "1rem",
-  },
-  statsContainer: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-    gap: "1.5rem",
-    marginBottom: "2rem",
-  },
-  statTitle: {
-    fontSize: "1.2rem",
-    fontWeight: 600,
-    color: "#666666",
-    marginBottom: "0.5rem",
-  },
-  statValue: {
-    fontSize: "1.8rem",
-    fontWeight: 700,
-  },
-  planName: {
-    fontSize: "1.5rem",
-    fontWeight: 700,
-    color: "#333333",
-    marginBottom: "0.5rem",
-  },
-  planButton: {
-    background: "#00c4b4",
-    color: "#ffffff",
-    border: "none",
-    padding: "0.75rem 1.5rem",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontSize: "1rem",
-    fontWeight: 500,
-    width: "auto",
-    transition: "background 0.3s, transform 0.3s",
-  },
-  filterButton: {
-    background: "transparent",
-    color: "#00c4b4",
-    border: "1px solid #00c4b4",
-    padding: "0.5rem 1rem",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontSize: "0.9rem",
-    fontWeight: 500,
-    transition: "background 0.3s, transform 0.3s",
-  },
-  deleteButton: {
-    background: "#ef4444",
-    color: "#ffffff",
-    border: "none",
-    padding: "0.5rem 1rem",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontSize: "0.875rem",
-    transition: "background 0.3s, transform 0.3s",
-  },
-  iconContainer: {
-    backgroundColor: "#e5e7eb",
-    borderRadius: "8px",
-    padding: "12px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  tableContainer: {
-    background: "#ffffff",
-    borderRadius: "8px",
-    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-    overflowX: "auto",
-    animation: "fadeIn 0.8s ease-out",
-  },
-  table: {
-    width: "100%",
-    borderCollapse: "collapse",
-  },
-  tableHeader: {
-    background: "#f5f6f5",
-  },
-  tableCell: {
-    padding: "0.75rem",
-    fontSize: "0.875rem",
-    color: "#333333",
-    textAlign: "left",
-    borderBottom: "1px solid #e5e7eb",
-  },
-  tableRow: {
-    transition: "background-color 0.3s",
-  },
-  noData: {
-    fontSize: "1rem",
-    color: "#666666",
-    textAlign: "center",
-    padding: "2rem",
-  },
-  footer: {
-    background: "#0f2b5b",
-    padding: "2rem",
-    textAlign: "center",
-    color: "#ffffff",
-  },
-  footerText: {
-    fontSize: "0.875rem",
-    fontWeight: 400,
-    marginBottom: "1rem",
-  },
-  footerLinks: {
-    display: "flex",
-    justifyContent: "center",
-    gap: "1.5rem",
-  },
-  footerLink: {
-    fontSize: "0.875rem",
-    color: "#ffffff",
-    textDecoration: "none",
-    fontWeight: 400,
-  },
-};
-
-CombinedTracker.propTypes = {};
-
 export default CombinedTracker;
-
-

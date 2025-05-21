@@ -1,562 +1,567 @@
-import React, { useEffect, useState, useMemo, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import Cookies from "universal-cookie";
 import { useNavigate } from "react-router-dom";
-import { CSVLink } from "react-csv";
-import { 
-  Card, CardContent, Typography, Grid, TextField, Button, 
-  Select, MenuItem, FormControl, InputLabel, Switch, Chip,
-  Table, TableBody, TableCell, TableContainer, TableHead, 
-  TableRow, Paper, IconButton, Snackbar, Alert, Divider,
-  List, ListItem, ListItemText, ListItemIcon, Collapse
-} from "@mui/material";
-import { 
-  PictureAsPdf, TableChart, Print, CloudDownload,
-  DateRange, ArrowDropDown, ArrowDropUp, DarkMode, LightMode,
-  Share, Timeline, PieChart as PieChartIcon, BarChart as BarChartIcon,
-  Search  // Added this import
-} from "@mui/icons-material";
-import { saveAs } from 'file-saver';
-import * as XLSX from 'xlsx';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
-import { 
-  PieChart, Pie, BarChart, Bar, LineChart, Line, 
-  Tooltip, Legend, ResponsiveContainer, Cell, XAxis, YAxis, CartesianGrid 
-} from "recharts";
+import { FiHome, FiStar, FiCalendar, FiFlag, FiBarChart, FiLogOut } from "react-icons/fi";
+import { Pie } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+} from "chart.js";
+
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement
+);
 
 const Reports = () => {
   const cookies = new Cookies();
   const navigate = useNavigate();
   const API_URL = "http://localhost:8090";
-  const searchInputRef = useRef(null);
+  const getAuthToken = () => cookies.get("token");
 
   // State management
-  const [transactions, setTransactions] = useState([]);
-  const [darkMode, setDarkMode] = useState(false);
-  const [downloadHistory, setDownloadHistory] = useState([]);
-  const [timeRange, setTimeRange] = useState('last-30-days');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [openSnackbar, setOpenSnackbar] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState("");
-  const [expandedSection, setExpandedSection] = useState({
-    categoryChart: true,
-    monthlyChart: true,
-    transactions: true
-  });
+  const [reportData, setReportData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedFilter, setSelectedFilter] = useState("All");
+  const expenseChartRef = useRef(null); // Ref to track chart canvas
 
-  // Time range options
-  const timeOptions = [
-    { value: 'last-7-days', label: 'Last 7 Days' },
-    { value: 'last-30-days', label: 'Last 30 Days' },
-    { value: 'this-month', label: 'This Month' },
-    { value: 'last-month', label: 'Last Month' },
-    { value: 'this-year', label: 'This Year' },
-    { value: 'custom', label: 'Custom Range' }
-  ];
-
-  // Fetch transactions
-  const fetchTransactions = async () => {
-    const token = cookies.get("token");
+  // Fetch report data from backend
+  const fetchReportData = async () => {
+    const token = getAuthToken();
     if (!token) {
       navigate("/login");
       return;
     }
-
     try {
-      const res = await axios.get(`${API_URL}/transaction/all`, {
-        headers: { Authorization: `Bearer ${token}` }
+      setLoading(true);
+      const response = await axios.get(`${API_URL}/reports/data?quarter=${selectedFilter}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-      setTransactions(res.data);
+      console.log("Report Data:", response.data);
+      console.log("Category Breakdown:", response.data.categoryBreakdown);
+      setReportData(response.data);
+      setLoading(false);
     } catch (err) {
-      showSnackbar("Failed to fetch transactions");
-      console.error("Fetch error:", err);
+      console.error("Failed to fetch report data:", err);
+      setError("Failed to fetch report data.");
+      setLoading(false);
     }
   };
 
-  // Apply filters
-  const filteredTransactions = useMemo(() => {
-    let result = [...transactions];
-    const now = new Date();
-
-    // Time range filter
-    switch(timeRange) {
-      case 'last-7-days':
-        const weekAgo = new Date(now.setDate(now.getDate() - 7));
-        result = result.filter(t => new Date(t.transactionDate) >= weekAgo);
-        break;
-      case 'last-30-days':
-        const monthAgo = new Date(now.setDate(now.getDate() - 30));
-        result = result.filter(t => new Date(t.transactionDate) >= monthAgo);
-        break;
-      // Add other time range cases
-    }
-
-    // Category filter
-    if (categoryFilter !== 'all') {
-      result = result.filter(t => t.category === categoryFilter);
-    }
-
-    return result;
-  }, [transactions, timeRange, categoryFilter]);
-
-  // Calculate summary data
-  const summary = useMemo(() => {
-    const income = filteredTransactions
-      .filter(t => t.amount > 0)
-      .reduce((sum, t) => sum + t.amount, 0);
-    const expenses = filteredTransactions
-      .filter(t => t.amount < 0)
-      .reduce((sum, t) => sum + t.amount, 0);
-    const tax = income * 0.1;
-
-    return { income, expenses, tax, net: income + expenses };
-  }, [filteredTransactions]);
-
-  // Prepare chart data
-  const categoryData = useMemo(() => {
-    const categories = filteredTransactions.reduce((acc, txn) => {
-      acc[txn.category] = (acc[txn.category] || 0) + txn.amount;
-      return acc;
-    }, {});
-
-    return Object.entries(categories).map(([name, value]) => ({
-      name,
-      value: Math.abs(value),
-      type: value >= 0 ? 'Income' : 'Expense'
-    }));
-  }, [filteredTransactions]);
-
-  const monthlyData = useMemo(() => {
-    const months = Array(12).fill(0);
-    filteredTransactions.forEach(txn => {
-      const month = new Date(txn.transactionDate).getMonth();
-      months[month] += txn.amount;
-    });
-
-    return months.map((amount, index) => ({
-      name: new Date(2023, index).toLocaleString('default', { month: 'short' }),
-      income: amount > 0 ? amount : 0,
-      expense: amount < 0 ? Math.abs(amount) : 0
-    }));
-  }, [filteredTransactions]);
-
-  // Export functions
-  const exportToPDF = () => {
-    const doc = new jsPDF();
-    doc.text("Transaction Report", 20, 10);
-    doc.autoTable({
-      head: [["Date", "Description", "Amount", "Category"]],
-      body: filteredTransactions.map(t => [
-        new Date(t.transactionDate).toLocaleDateString(),
-        t.description,
-        t.amount,
-        t.category
-      ])
-    });
-    const filename = `transactions_${new Date().toISOString().slice(0,10)}.pdf`;
-    doc.save(filename);
-    addToDownloadHistory('PDF', filename);
-    showSnackbar("PDF report generated");
-  };
-
-  const exportToExcel = () => {
-    const worksheet = XLSX.utils.json_to_sheet(filteredTransactions);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Transactions");
-    const filename = `transactions_${new Date().toISOString().slice(0,10)}.xlsx`;
-    XLSX.writeFile(workbook, filename);
-    addToDownloadHistory('Excel', filename);
-    showSnackbar("Excel report generated");
-  };
-
-  const exportChartAsImage = async (chartId, name) => {
-    const canvas = await html2canvas(document.getElementById(chartId));
-    canvas.toBlob(blob => {
-      saveAs(blob, `${name}.png`);
-      addToDownloadHistory('Image', `${name}.png`);
-      showSnackbar("Chart image saved");
-    });
-  };
-
-  const addToDownloadHistory = (type, filename) => {
-    setDownloadHistory(prev => [...prev, {
-      type,
-      filename,
-      timestamp: new Date().toISOString()
-    }]);
-  };
-
-  const showSnackbar = (message) => {
-    setSnackbarMessage(message);
-    setOpenSnackbar(true);
-  };
-
-  const toggleSection = (section) => {
-    setExpandedSection(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
-  };
-
-  // Initialize data
   useEffect(() => {
-    fetchTransactions();
-    const savedDarkMode = localStorage.getItem('darkMode') === 'true';
-    setDarkMode(savedDarkMode);
+    fetchReportData();
+  }, [selectedFilter]);
+
+  // Logout handler
+  const handleLogout = () => {
+    cookies.remove("token", { path: "/" });
+    navigate("/login");
+  };
+
+  // Export handlers
+  const handleExportPDF = async () => {
+    const token = getAuthToken();
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+    try {
+      const response = await axios.get(`${API_URL}/reports/export/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: "blob",
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `transactions_budgets_${Date.now()}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error("Error exporting PDF:", err);
+      alert("Error exporting PDF.");
+    }
+  };
+
+  const handleExportCSV = async () => {
+    const token = getAuthToken();
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+    try {
+      const response = await axios.get(`${API_URL}/reports/export/csv`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: "blob",
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `transactions_budgets_${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error("Error exporting CSV:", err);
+      alert("Error exporting CSV.");
+    }
+  };
+
+  // Budget Breakdown
+  const budgetTotal = reportData && reportData.budgetLimits
+    ? Object.values(reportData.budgetLimits).reduce((sum, amount) => sum + Number(amount), 0)
+    : 0;
+
+  const budgetChartData = reportData && reportData.budgetLimits ? {
+    labels: Object.keys(reportData.budgetLimits),
+    datasets: [
+      {
+        data: Object.values(reportData.budgetLimits).map(amount => Number(amount)),
+        backgroundColor: ["#4caf50", "#66bb6a", "#81c784", "#a5d6a7", "#c8e6c9"],
+        borderColor: ["#ffffff"],
+        borderWidth: 1,
+      },
+    ],
+  } : {
+    labels: ["No Data"],
+    datasets: [
+      {
+        data: [1],
+        backgroundColor: ["#e0e0e0"],
+        borderColor: ["#ffffff"],
+        borderWidth: 1,
+      },
+    ],
+  };
+
+  const budgetChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: "bottom" },
+      title: { 
+        display: true, 
+        text: budgetTotal > 0 
+          ? `Budget Breakdown (₹${budgetTotal.toLocaleString("en-IN")})` 
+          : "Budget Breakdown (No Data)" 
+      },
+      tooltip: {
+        enabled: budgetTotal > 0,
+        callbacks: {
+          label: context => `₹${context.raw.toLocaleString("en-IN")}`,
+        },
+      },
+    },
+  };
+
+  // Expense Breakdown
+  const expenseTotal = reportData && reportData.categoryBreakdown
+    ? Object.values(reportData.categoryBreakdown).reduce((sum, entry) => sum + (Number(entry.spent) || 0), 0)
+    : 0;
+
+  const expenseChartData = reportData && reportData.categoryBreakdown && Object.keys(reportData.categoryBreakdown).length > 0 ? {
+    labels: Object.keys(reportData.categoryBreakdown),
+    datasets: [
+      {
+        data: Object.values(reportData.categoryBreakdown).map(entry => Number(entry.spent) || 0),
+        backgroundColor: ["#d32f2f", "#ef5350", "#f44336", "#e57373", "#ef9a9a"],
+        borderColor: ["#ffffff"],
+        borderWidth: 1,
+      },
+    ],
+  } : {
+    labels: ["No Data"],
+    datasets: [
+      {
+        data: [1],
+        backgroundColor: ["#e0e0e0"],
+        borderColor: ["#ffffff"],
+        borderWidth: 1,
+      },
+    ],
+  };
+
+  console.log("Expense Chart Data:", expenseChartData);
+  console.log("Expense Total:", expenseTotal);
+
+  const expenseChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: "bottom" },
+      title: { 
+        display: true, 
+        text: expenseTotal > 0 
+          ? `Expense Breakdown (₹${expenseTotal.toLocaleString("en-IN")})` 
+          : "Expense Breakdown (No Data)" 
+      },
+      tooltip: {
+        enabled: expenseTotal > 0,
+        callbacks: {
+          label: context => `₹${context.raw.toLocaleString("en-IN")}`,
+        },
+      },
+    },
+  };
+
+  // Debug chart rendering
+  useEffect(() => {
+    if (expenseChartRef.current) {
+      console.log("Expense Chart Canvas:", expenseChartRef.current.canvas);
+    }
+    console.log("Reports Component Rendered - Header: ExpenseMate, Logout; Report Header: Reports only");
+  }, [reportData]);
+
+  // Hover effects
+  useEffect(() => {
+    const sidebarItems = document.querySelectorAll(".sidebar-item");
+    sidebarItems.forEach((item) => {
+      const isActive = item.classList.contains("active");
+      item.addEventListener("mouseenter", () => {
+        item.style.backgroundColor = isActive ? "rgba(0, 196, 180, 0.3)" : "#e0e0e0";
+      });
+      item.addEventListener("mouseleave", () => {
+        item.style.backgroundColor = isActive ? "rgba(0, 196, 180, 0.2)" : "transparent";
+      });
+    });
+
+    const buttons = document.querySelectorAll(".action-button");
+    buttons.forEach((button) => {
+      button.addEventListener("mouseenter", () => {
+        button.style.background = "linear-gradient(145deg, #00c4b4, #00a69a)";
+        button.style.transform = "scale(1.05)";
+      });
+      button.addEventListener("mouseleave", () => {
+        button.style.background = "#00c4b4";
+        button.style.transform = "scale(1)";
+      });
+    });
+
+    return () => {
+      sidebarItems.forEach((item) => {
+        item.removeEventListener("mouseenter", () => {});
+        item.removeEventListener("mouseleave", () => {});
+      });
+      buttons.forEach((button) => {
+        button.removeEventListener("mouseenter", () => {});
+        button.removeEventListener("mouseleave", () => {});
+      });
+    };
   }, []);
 
+  if (loading) {
+    return <div style={styles.container}>Loading...</div>;
+  }
+
+  if (error) {
+    return <div style={styles.container}>{error}</div>;
+  }
+
   return (
-    <div className={`min-h-screen p-4 ${darkMode ? "bg-gray-900" : "bg-gray-50"}`}>
+    <div style={styles.container}>
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <Typography variant="h4" component="h1" className="font-bold">
-          Financial Reports
-        </Typography>
-        <div className="flex items-center space-x-2">
-          <IconButton onClick={() => setDarkMode(!darkMode)}>
-            {darkMode ? <LightMode /> : <DarkMode />}
-          </IconButton>
-          <Typography variant="body2">
-            {darkMode ? "Light Mode" : "Dark Mode"}
-          </Typography>
+      <header style={styles.header}>
+        <div style={styles.logo}>
+          <span style={styles.logoText}>ExpenseMate</span>
         </div>
-      </div>
+        <button style={styles.logoutButton} onClick={handleLogout} aria-label="Log out">
+          <FiLogOut size={18} /> Logout
+        </button>
+      </header>
 
-      {/* Summary Cards */}
-      <Grid container spacing={3} className="mb-6">
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Total Income
-              </Typography>
-              <Typography variant="h5" className="text-green-600">
-                ₹{summary.income.toFixed(2)}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Total Expenses
-              </Typography>
-              <Typography variant="h5" className="text-red-600">
-                ₹{Math.abs(summary.expenses).toFixed(2)}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Net Balance
-              </Typography>
-              <Typography variant="h5" className={summary.net >= 0 ? "text-green-600" : "text-red-600"}>
-                ₹{summary.net.toFixed(2)}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Estimated Tax (10%)
-              </Typography>
-              <Typography variant="h5">
-                ₹{summary.tax.toFixed(2)}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Filters */}
-      <Card className="mb-6">
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            Filters
-          </Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6} md={3}>
-              <FormControl fullWidth>
-                <InputLabel>Time Range</InputLabel>
-                <Select
-                  value={timeRange}
-                  onChange={(e) => setTimeRange(e.target.value)}
-                  label="Time Range"
-                >
-                  {timeOptions.map(option => (
-                    <MenuItem key={option.value} value={option.value}>
-                      {option.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <FormControl fullWidth>
-                <InputLabel>Category</InputLabel>
-                <Select
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                  label="Category"
-                >
-                  <MenuItem value="all">All Categories</MenuItem>
-                  {[...new Set(transactions.map(t => t.category))].map(cat => (
-                    <MenuItem key={cat} value={cat}>{cat}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <TextField
-                fullWidth
-                label="Search"
-                inputRef={searchInputRef}
-                InputProps={{
-                  startAdornment: <Search className="mr-2" />
+      {/* Main Layout */}
+      <div style={styles.layout}>
+        {/* Sidebar Navigation */}
+        <nav style={styles.sidebar}>
+          <ul style={styles.sidebarList}>
+            {[
+              { text: "Dashboard", icon: <FiHome size={18} />, path: "/dashboard" },
+              { text: "Transactions", icon: <FiStar size={18} />, path: "/transactions" },
+              { text: "Budgets", icon: <FiCalendar size={18} />, path: "/budgets" },
+              { text: "Goals", icon: <FiFlag size={18} />, path: "/goals" },
+              { text: "Reports", icon: <FiBarChart size={18} />, path: "/reports", active: true },
+            ].map((item) => (
+              <li
+                key={item.text}
+                className={`sidebar-item ${item.active ? "active" : ""}`}
+                style={{
+                  ...styles.sidebarItem,
+                  backgroundColor: item.active ? "rgba(0, 196, 180, 0.2)" : "transparent",
+                  color: item.active ? "#00c4b4" : "#333",
                 }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              <div className="flex space-x-2">
-                <Button 
-                  variant="contained" 
-                  startIcon={<PictureAsPdf />}
-                  onClick={exportToPDF}
-                >
-                  PDF
-                </Button>
-                <Button 
-                  variant="contained" 
-                  startIcon={<TableChart />}
-                  onClick={exportToExcel}
-                >
-                  Excel
-                </Button>
-                <CSVLink
-                  data={filteredTransactions}
-                  filename={`transactions_${new Date().toISOString().slice(0,10)}.csv`}
-                  onClick={() => addToDownloadHistory('CSV', 'transactions.csv')}
-                >
-                  <Button variant="contained" startIcon={<TableChart />}>
-                    CSV
-                  </Button>
-                </CSVLink>
-                <Button 
-                  variant="contained" 
-                  startIcon={<Print />}
-                  onClick={() => window.print()}
-                >
-                  Print
-                </Button>
-              </div>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
-
-      {/* Charts Section */}
-      <Grid container spacing={3} className="mb-6">
-        {/* Category Breakdown */}
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <div 
-                className="flex justify-between items-center cursor-pointer"
-                onClick={() => toggleSection('categoryChart')}
+                onClick={() => navigate(item.path)}
               >
-                <Typography variant="h6" gutterBottom>
-                  <PieChartIcon className="mr-2" />
-                  Category Breakdown
-                </Typography>
-                {expandedSection.categoryChart ? <ArrowDropUp /> : <ArrowDropDown />}
-              </div>
-              <Collapse in={expandedSection.categoryChart}>
-                <div id="category-chart" style={{ height: 400 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={categoryData}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="value"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      >
-                        {categoryData.map((entry, index) => (
-                          <Cell 
-                            key={`cell-${index}`} 
-                            fill={entry.type === 'Income' ? '#4CAF50' : '#F44336'} 
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value) => [`₹${value}`, "Amount"]} />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="flex justify-end">
-                  <Button
-                    startIcon={<CloudDownload />}
-                    onClick={() => exportChartAsImage('category-chart', 'category-breakdown')}
-                  >
-                    Download Chart
-                  </Button>
-                </div>
-              </Collapse>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Monthly Breakdown */}
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <div 
-                className="flex justify-between items-center cursor-pointer"
-                onClick={() => toggleSection('monthlyChart')}
-              >
-                <Typography variant="h6" gutterBottom>
-                  <BarChartIcon className="mr-2" />
-                  Monthly Breakdown
-                </Typography>
-                {expandedSection.monthlyChart ? <ArrowDropUp /> : <ArrowDropDown />}
-              </div>
-              <Collapse in={expandedSection.monthlyChart}>
-                <div id="monthly-chart" style={{ height: 400 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={monthlyData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip formatter={(value) => [`₹${value}`, "Amount"]} />
-                      <Legend />
-                      <Bar dataKey="income" fill="#4CAF50" name="Income" />
-                      <Bar dataKey="expense" fill="#F44336" name="Expense" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="flex justify-end">
-                  <Button
-                    startIcon={<CloudDownload />}
-                    onClick={() => exportChartAsImage('monthly-chart', 'monthly-breakdown')}
-                  >
-                    Download Chart
-                  </Button>
-                </div>
-              </Collapse>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Transactions Table */}
-      <Card>
-        <CardContent>
-          <div 
-            className="flex justify-between items-center cursor-pointer"
-            onClick={() => toggleSection('transactions')}
-          >
-            <Typography variant="h6" gutterBottom>
-              Transaction Details ({filteredTransactions.length})
-            </Typography>
-            {expandedSection.transactions ? <ArrowDropUp /> : <ArrowDropDown />}
-          </div>
-          <Collapse in={expandedSection.transactions}>
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Date</TableCell>
-                    <TableCell>Description</TableCell>
-                    <TableCell align="right">Amount</TableCell>
-                    <TableCell>Category</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredTransactions.length > 0 ? (
-                    filteredTransactions.map((txn) => (
-                      <TableRow key={txn.id}>
-                        <TableCell>
-                          {new Date(txn.transactionDate).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>{txn.description}</TableCell>
-                        <TableCell 
-                          align="right"
-                          className={txn.amount >= 0 ? "text-green-600" : "text-red-600"}
-                        >
-                          ₹{txn.amount.toFixed(2)}
-                        </TableCell>
-                        <TableCell>
-                          <Chip label={txn.category} size="small" />
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={4} align="center">
-                        No transactions found
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Collapse>
-        </CardContent>
-      </Card>
-
-      {/* Download History */}
-      <Card className="mt-6">
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            Download History
-          </Typography>
-          <List>
-            {downloadHistory.slice().reverse().map((item, index) => (
-              <ListItem key={index}>
-                <ListItemIcon>
-                  {item.type === 'PDF' && <PictureAsPdf />}
-                  {item.type === 'Excel' && <TableChart />}
-                  {item.type === 'CSV' && <TableChart />}
-                  {item.type === 'Image' && <Share />}
-                </ListItemIcon>
-                <ListItemText
-                  primary={item.filename}
-                  secondary={new Date(item.timestamp).toLocaleString()}
-                />
-              </ListItem>
+                <span style={{ ...styles.sidebarIcon, color: item.active ? "#00c4b4" : "#666" }}>
+                  {item.icon}
+                </span>
+                <span>{item.text}</span>
+              </li>
             ))}
-            {downloadHistory.length === 0 && (
-              <ListItem>
-                <ListItemText primary="No download history yet" />
-              </ListItem>
-            )}
-          </List>
-        </CardContent>
-      </Card>
+          </ul>
+        </nav>
 
-      {/* Snackbar */}
-      <Snackbar
-        open={openSnackbar}
-        autoHideDuration={3000}
-        onClose={() => setOpenSnackbar(false)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        <Alert onClose={() => setOpenSnackbar(false)} severity="success">
-          {snackbarMessage}
-        </Alert>
-      </Snackbar>
+        {/* Main Content */}
+        <main style={styles.main}>
+          <section style={styles.section}>
+            {/* Report Header */}
+            <h2 style={styles.sectionTitle}>Reports</h2>
+
+            {/* Two Graphs in One Row */}
+            <div style={{ ...styles.graphsContainer, gridTemplateColumns: "repeat(2, 1fr)" }}>
+              {/* Budget Breakdown */}
+              <div style={styles.chartCard}>
+                <h2 style={styles.chartTitle}>Budget Breakdown</h2>
+                <div style={styles.chartWrapper}>
+                  <Pie data={budgetChartData} options={budgetChartOptions} />
+                </div>
+              </div>
+
+              {/* Expense Breakdown */}
+              <div style={styles.chartCard}>
+                <h2 style={styles.chartTitle}>Expense Breakdown</h2>
+                <div style={styles.chartWrapper}>
+                  <Pie
+                    ref={expenseChartRef}
+                    data={expenseChartData}
+                    options={expenseChartOptions}
+                    onError={() => console.error("Error rendering Expense Breakdown chart")}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Filter Bar */}
+            <div style={styles.filterContainer}>
+              <h3 style={styles.filterTitle}>Filter by Period</h3>
+              <div style={styles.filterButtons}>
+                {["All", "Q1", "Q2", "Q3", "Q4"].map((filter) => (
+                  <button
+                    key={filter}
+                    style={{
+                      ...styles.filterButton,
+                      backgroundColor: selectedFilter === filter ? "#00c4b4" : "#e0e0e0",
+                      color: selectedFilter === filter ? "#fff" : "#333",
+                    }}
+                    className="action-button"
+                    onClick={() => setSelectedFilter(filter)}
+                  >
+                    {filter}
+                  </button>
+                ))}
+              </div>
+              <div style={styles.exportButtons}>
+                <button
+                  style={styles.addButton}
+                  className="action-button"
+                  onClick={handleExportPDF}
+                >
+                  Export PDF
+                </button>
+                <button
+                  style={styles.addButton}
+                  className="action-button"
+                  onClick={handleExportCSV}
+                >
+                  Export CSV
+                </button>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
     </div>
   );
+};
+
+const styles = {
+  container: {
+    fontFamily: "'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif",
+    background: "#ffffff",
+    minHeight: "100vh",
+    boxSizing: "border-box",
+  },
+  header: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    background: "#0f2b5b",
+    padding: "1rem 1.5rem",
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+    boxSizing: "border-box",
+    maxWidth: "100vw",
+    overflow: "hidden",
+  },
+  logo: {
+    display: "flex",
+    alignItems: "center",
+    flexShrink: 0,
+  },
+  logoText: {
+    fontSize: "1.5rem",
+    fontWeight: 700,
+    background: "linear-gradient(90deg, #4f46e5, #00c4b4)",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    whiteSpace: "nowrap",
+  },
+  logoutButton: {
+    background: "#00c4b4",
+    color: "#ffffff",
+    border: "none",
+    padding: "0.5rem 1rem",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "0.9rem",
+    fontWeight: 500,
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    transition: "background 0.3s, transform 0.3s",
+    flexShrink: 0,
+    whiteSpace: "nowrap",
+  },
+  layout: {
+    display: "flex",
+    paddingTop: "64px",
+  },
+  sidebar: {
+    width: "160px",
+    background: "#f5f6f5",
+    height: "calc(100vh - 64px)",
+    position: "fixed",
+    top: "64px",
+    left: 0,
+    borderRight: "1px solid #e5e7eb",
+    boxSizing: "border-box",
+  },
+  sidebarList: {
+    listStyle: "none",
+    padding: 0,
+    margin: 0,
+    paddingTop: "1rem",
+  },
+  sidebarItem: {
+    display: "flex",
+    alignItems: "center",
+    padding: "0 1rem",
+    height: "2.5rem",
+    cursor: "pointer",
+    transition: "background-color 0.3s",
+    fontSize: "0.875rem",
+    lineHeight: "1",
+  },
+  sidebarIcon: {
+    marginRight: "0.5rem",
+  },
+  main: {
+    marginLeft: "160px",
+    padding: "1rem 1rem 2rem",
+    flexGrow: 1,
+    boxSizing: "border-box",
+  },
+  section: {
+    padding: "0",
+    background: "#f5f6f5",
+  },
+  sectionTitle: {
+    fontSize: "2rem",
+    fontWeight: 700,
+    color: "#333333",
+    marginBottom: "1.5rem",
+    lineHeight: "1",
+  },
+  graphsContainer: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, 1fr)",
+    gap: "1rem",
+    marginBottom: "2rem",
+  },
+  chartCard: {
+    background: "#ffffff",
+    borderRadius: "8px",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+    padding: "1.5rem",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    minHeight: "300px",
+  },
+  chartTitle: {
+    fontSize: "1.25rem",
+    fontWeight: 600,
+    color: "#333333",
+    marginBottom: "1rem",
+    display: "flex",
+    alignItems: "center",
+  },
+  chartWrapper: {
+    maxWidth: "300px",
+    width: "100%",
+    height: "250px",
+    position: "relative",
+  },
+  filterContainer: {
+    marginBottom: "2rem",
+  },
+  filterTitle: {
+    fontSize: "1.25rem",
+    fontWeight: 600,
+    color: "#333333",
+    marginBottom: "1rem",
+  },
+  filterButtons: {
+    display: "flex",
+    gap: "0.5rem",
+    marginBottom: "1rem",
+  },
+  filterButton: {
+    background: "#e0e0e0",
+    color: "#333",
+    border: "none",
+    padding: "0.5rem 1rem",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "0.875rem",
+    transition: "background 0.3s, transform 0.3s",
+  },
+  exportButtons: {
+    display: "flex",
+    gap: "1rem",
+  },
+  addButton: {
+    background: "#00c4b4",
+    color: "#ffffff",
+    border: "none",
+    padding: "0.75rem 1.5rem",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "0.875rem",
+    fontWeight: 500,
+    display: "flex",
+    alignItems: "center",
+    transition: "background 0.3s, transform 0.3s",
+  },
 };
 
 export default Reports;
