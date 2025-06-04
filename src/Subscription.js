@@ -7,9 +7,9 @@ import { FiLogOut } from "react-icons/fi";
 const Subscription = () => {
   const [subscriptions, setSubscriptions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [userRole, setUserRole] = useState(null); // Store user role
-  const [stats, setStats] = useState(null); // Store admin stats
-  const [razorpayOrderId, setRazorpayOrderId] = useState(null); // Store Razorpay order ID for payments
+  const [userRole, setUserRole] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [razorpayOrderId, setRazorpayOrderId] = useState(null);
 
   const cookies = new Cookies();
   const navigate = useNavigate();
@@ -42,7 +42,6 @@ const Subscription = () => {
       });
       console.log("Profile response:", res.data);
 
-      // Flexible role parsing
       let roles = [];
       if (res.data.roles) {
         roles = res.data.roles.split(",").map((role) => role.trim());
@@ -184,7 +183,7 @@ const Subscription = () => {
       const headers = { Authorization: `Bearer ${token}` };
       const planData = {
         name: `${plan} Plan`,
-        cost: plan === "Pro" ? 9.99 : plan === "Family" ? 14.99 : 0,
+        cost: plan === "Pro" ? 999 : plan === "Family" ? 1499 : 0, // Updated to INR
         renewalDate: new Date().toISOString().split("T")[0],
         frequency: "Monthly",
         paymentMethod: plan === "Free" ? "None" : "Razorpay",
@@ -222,7 +221,7 @@ const Subscription = () => {
       await loadRazorpayScript();
       const options = {
         key: "rzp_test_uvMwjsQv3hPcCl", // Replace with your Razorpay API key
-        amount: Math.round(parseFloat(amount) * 100), // Convert to paise
+        amount: Math.round(parseFloat(amount) * 100), // Convert INR to paise
         currency: "INR",
         order_id: orderId,
         handler: async function (response) {
@@ -323,7 +322,7 @@ const Subscription = () => {
               {/* Free Plan */}
               <div style={styles.pricingCard} className="pricing-card">
                 <h3 style={styles.planName}>Free</h3>
-                <p style={styles.planPrice}>$0/month</p>
+                <p style={styles.planPrice}>₹0/month</p>
                 <ul style={styles.planFeatures}>
                   <li>Track expenses & income</li>
                   <li>Basic budgeting</li>
@@ -344,7 +343,7 @@ const Subscription = () => {
               <div style={{ ...styles.pricingCard, position: "relative" }} className="pricing-card">
                 <span style={styles.popularBadge}>Most Popular</span>
                 <h3 style={styles.planName}>Pro</h3>
-                <p style={styles.planPrice}>$9.99/month</p>
+                <p style={styles.planPrice}>₹999/month</p>
                 <ul style={styles.planFeatures}>
                   <li>Everything in Free, plus:</li>
                   <li>Unlimited accounts</li>
@@ -366,7 +365,7 @@ const Subscription = () => {
               {/* Family Plan */}
               <div style={styles.pricingCard} className="pricing-card">
                 <h3 style={styles.planName}>Family</h3>
-                <p style={styles.planPrice}>$14.99/month</p>
+                <p style={styles.planPrice}>₹1499/month</p>
                 <ul style={styles.planFeatures}>
                   <li>Everything in Pro, plus:</li>
                   <li>Up to 5 family members</li>
@@ -400,11 +399,11 @@ const Subscription = () => {
                 </div>
                 <div style={styles.statCard} className="stat-card">
                   <h3 style={styles.statTitle}>Total Monthly Cost</h3>
-                  <p style={styles.statValue}>${stats.totalMonthlyCost.toFixed(2)}</p>
+                  <p style={styles.statValue}>₹{stats.totalMonthlyCost.toFixed(2)}</p>
                 </div>
                 <div style={styles.statCard} className="stat-card">
                   <h3 style={styles.statTitle}>Total Yearly Cost</h3>
-                  <p style={styles.statValue}>${stats.totalYearlyCost.toFixed(2)}</p>
+                  <p style={styles.statValue}>₹{stats.totalYearlyCost.toFixed(2)}</p>
                 </div>
               </div>
             )}
@@ -437,7 +436,7 @@ const Subscription = () => {
                     {subscriptions.map((sub) => (
                       <tr key={sub.id} style={styles.tableRow}>
                         <td style={styles.tableCell}>{sub.name}</td>
-                        <td style={styles.tableCell}>{sub.cost}</td>
+                        <td style={styles.tableCell}>₹{sub.cost}</td>
                         <td style={styles.tableCell}>{sub.renewalDate}</td>
                         <td style={styles.tableCell}>{sub.frequency}</td>
                         <td style={styles.tableCell}>{sub.paymentMethod}</td>
@@ -489,7 +488,7 @@ const styles = {
     alignItems: "center",
     justifyContent: "space-between",
     background: "#0f2b5b",
-    padding: "1rem 1.5rem", // Reduced padding to avoid excessive space
+    padding: "1rem 1.5rem",
     position: "fixed",
     top: 0,
     left: 0,
@@ -497,40 +496,40 @@ const styles = {
     zIndex: 1000,
     boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
     boxSizing: "border-box",
-    maxWidth: "100vw", // Ensure header doesn't exceed viewport width
-    overflow: "hidden", // Prevent content from overflowing
+    maxWidth: "100vw",
+    overflow: "hidden",
   },
   logo: {
     display: "flex",
     alignItems: "center",
-    flexShrink: 0, // Prevent logo from shrinking
+    flexShrink: 0,
   },
   logoText: {
-    fontSize: "1.5rem", // Slightly reduced font size for better fit
+    fontSize: "1.5rem",
     fontWeight: 700,
     background: "linear-gradient(90deg, #4f46e5, #00c4b4)",
     WebkitBackgroundClip: "text",
     WebkitTextFillColor: "transparent",
-    whiteSpace: "nowrap", // Prevent text wrapping
+    whiteSpace: "nowrap",
   },
   logoutButton: {
     background: "#00c4b4",
     color: "#ffffff",
     border: "none",
-    padding: "0.5rem 1rem", // Reduced padding for compactness
+    padding: "0.5rem 1rem",
     borderRadius: "6px",
     cursor: "pointer",
-    fontSize: "0.9rem", // Slightly smaller font size
+    fontSize: "0.9rem",
     fontWeight: 500,
     display: "flex",
     alignItems: "center",
     gap: "0.5rem",
     transition: "background 0.3s, transform 0.3s",
-    flexShrink: 0, // Prevent button from shrinking
-    whiteSpace: "nowrap", // Prevent text wrapping
+    flexShrink: 0,
+    whiteSpace: "nowrap",
   },
   main: {
-    padding: "5rem 1rem 2rem", // Adjusted padding for better spacing
+    padding: "5rem 1rem 2rem",
     maxWidth: "1200px",
     margin: "0 auto",
     boxSizing: "border-box",
@@ -598,7 +597,7 @@ const styles = {
   },
   planFeatures: {
     listStyle: "none",
-    padding: 0,
+    padding: "0",
     marginBottom: "1.5rem",
     fontSize: "0.875rem",
     color: "#666666",

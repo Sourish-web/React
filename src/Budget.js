@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Cookies from "universal-cookie";
 import { useNavigate } from "react-router-dom";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { FiHome, FiCalendar, FiDollarSign, FiFlag, FiBarChart, FiPlus, FiEdit, FiTrash2 } from "react-icons/fi";
 
 const Budget = () => {
@@ -20,7 +22,7 @@ const Budget = () => {
     period: "MONTHLY",
     spent: "0",
     startDate: new Date().toISOString().split("T")[0],
-    endDate: new Date(new Date().setMonth(new Date().getMonth() + 1))
+    endDate: new Date(new Date().setDate(new Date().getDate() + 30))
       .toISOString()
       .split("T")[0],
     category: "OTHER",
@@ -40,10 +42,51 @@ const Budget = () => {
   ];
   const periods = ["WEEKLY", "MONTHLY", "YEARLY"];
 
+  // Calculate endDate based on period and startDate
+  const calculateEndDate = (startDate, period) => {
+    const start = new Date(startDate);
+    let endDate = new Date(start);
+    if (period === "WEEKLY") {
+      endDate.setDate(start.getDate() + 7);
+    } else if (period === "MONTHLY") {
+      endDate.setMonth(start.getMonth() + 1);
+    } else if (period === "YEARLY") {
+      endDate.setFullYear(start.getFullYear() + 1);
+    }
+    return endDate.toISOString().split("T")[0];
+  };
+
+  // Validate date range based on period
+  const validateDateRange = (startDate, endDate, period) => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = end - start;
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+    if (period === "WEEKLY") {
+      return Math.abs(diffDays - 7) <= 1; // Allow 1-day tolerance
+    } else if (period === "MONTHLY") {
+      return diffDays >= 28 && diffDays <= 31; // Typical month range
+    } else if (period === "YEARLY") {
+      return diffDays >= 365 && diffDays <= 366; // Account for leap years
+    }
+    return false;
+  };
+
+  // Update endDate when period or startDate changes
+  useEffect(() => {
+    if (!isEditing) {
+      // Only auto-update endDate for new budgets, not when editing
+      const newEndDate = calculateEndDate(form.startDate, form.period);
+      setForm((prev) => ({ ...prev, endDate: newEndDate }));
+    }
+  }, [form.startDate, form.period, isEditing]);
+
   // Fetch budgets from backend
   const fetchBudgets = async () => {
     const token = getAuthToken();
     if (!token) {
+      toast.error("You are not authenticated. Please log in.");
       navigate("/login");
       return;
     }
@@ -56,13 +99,13 @@ const Budget = () => {
           ...budget,
           amount: Number(budget.amount),
           spent: Number(budget.spent || 0),
-          startDate: budget.startDate.split("T")[0], // Ensure date is in YYYY-MM-DD format
-          endDate: budget.endDate.split("T")[0], // Ensure date is in YYYY-MM-DD format
+          startDate: budget.startDate.split("T")[0],
+          endDate: budget.endDate.split("T")[0],
         }))
       );
     } catch (err) {
       console.error("Failed to fetch budgets:", err);
-      alert("Failed to fetch budgets.");
+      toast.error("Failed to fetch budgets.");
     }
   };
 
@@ -85,12 +128,24 @@ const Budget = () => {
     e.preventDefault();
     const token = getAuthToken();
     if (!token) {
+      toast.error("You are not authenticated. Please log in.");
       navigate("/login");
       return;
     }
 
+    // Validate date range
+    if (!validateDateRange(form.startDate, form.endDate, form.period)) {
+      toast.error(
+        `The date range does not match the selected period (${form.period.toLowerCase()}). ` +
+          `For WEEKLY, end date must be 7 days after start date. ` +
+          `For MONTHLY, end date must be ~1 month after start date. ` +
+          `For YEARLY, end date must be ~1 year after start date.`
+      );
+      return;
+    }
+
     const payload = {
-      id: isEditing ? form.id : undefined, // Include id only for updates
+      id: isEditing ? form.id : undefined,
       amount: Number(form.amount),
       spent: Number(form.spent || 0),
       period: form.period,
@@ -104,11 +159,12 @@ const Budget = () => {
       await axios.post(`${API_URL}${endpoint}`, payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      toast.success(isEditing ? "Budget updated successfully!" : "Budget added successfully!");
       resetForm();
       fetchBudgets();
     } catch (err) {
       console.error(`Error ${isEditing ? "updating" : "adding"} budget:`, err);
-      alert(
+      toast.error(
         `Error ${isEditing ? "updating" : "adding"} budget: ${
           err.response?.data || "Unknown error"
         }`
@@ -123,9 +179,7 @@ const Budget = () => {
       period: "MONTHLY",
       spent: "0",
       startDate: new Date().toISOString().split("T")[0],
-      endDate: new Date(new Date().setMonth(new Date().getMonth() + 1))
-        .toISOString()
-        .split("T")[0],
+      endDate: calculateEndDate(new Date().toISOString().split("T")[0], "MONTHLY"),
       category: "OTHER",
     });
     setIsEditing(false);
@@ -139,8 +193,8 @@ const Budget = () => {
       spent: budget.spent.toString(),
       period: budget.period,
       category: budget.category,
-      startDate: budget.startDate, // Already formatted as YYYY-MM-DD
-      endDate: budget.endDate, // Already formatted as YYYY-MM-DD
+      startDate: budget.startDate,
+      endDate: budget.endDate,
     });
     setIsEditing(true);
     setOpenDialog(true);
@@ -149,6 +203,7 @@ const Budget = () => {
   const handleDelete = async (id) => {
     const token = getAuthToken();
     if (!token) {
+      toast.error("You are not authenticated. Please log in.");
       navigate("/login");
       return;
     }
@@ -159,10 +214,11 @@ const Budget = () => {
       await axios.get(`${API_URL}/Budget/delete/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      toast.success("Budget deleted successfully!");
       fetchBudgets();
     } catch (err) {
       console.error("Delete failed:", err);
-      alert(`Delete failed: ${err.response?.data || "Unknown error"}`);
+      toast.error(`Delete failed: ${err.response?.data || "Unknown error"}`);
     }
   };
 
@@ -224,6 +280,7 @@ const Budget = () => {
 
   return (
     <div style={styles.container}>
+      <ToastContainer position="top-right" autoClose={5000} theme="dark" />
       {/* Header */}
       <header style={styles.header}>
         <div style={styles.logo}>
@@ -312,12 +369,12 @@ const Budget = () => {
             <div style={styles.tableContainer}>
               <table style={styles.table}>
                 <thead>
- |                  <tr style={styles.tableHeader}>
+                  <tr style={styles.tableHeader}>
                     <th style={styles.tableCell}>Name</th>
                     <th style={styles.tableCell}>Budget</th>
                     <th style={styles.tableCell}>Used Amount</th>
                     <th style={styles.tableCell}>Balance Left</th>
-                    <th style={styles.tableCell}>Actions</th> {/* Updated header */}
+                    <th style={styles.tableCell}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>

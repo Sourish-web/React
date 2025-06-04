@@ -12,6 +12,9 @@ const Settings = () => {
   const API_URL = 'http://localhost:8090';
 
   const [user, setUser] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [editingUser, setEditingUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [passwordChange, setPasswordChange] = useState({
     currentPassword: '',
@@ -29,7 +32,7 @@ const Settings = () => {
   };
 
   const handleClose = () => {
-    navigate('/dashboard'); // Adjust to your desired route
+    navigate('/dashboard');
   };
 
   useEffect(() => {
@@ -37,7 +40,6 @@ const Settings = () => {
   }, []);
 
   useEffect(() => {
-    // Add hover and ripple effects
     const buttons = document.querySelectorAll('.action-button');
     buttons.forEach((button) => {
       button.addEventListener('mouseenter', () => {
@@ -86,6 +88,7 @@ const Settings = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       setUser({
+        id: response.data.id || '',
         name: response.data.name || '',
         customUsername: response.data.customUsername || '',
         email: response.data.email || '',
@@ -105,13 +108,33 @@ const Settings = () => {
         skills: response.data.skills || '',
         panCard: response.data.panCard || '',
         profilePicture: response.data.profilePicture || '',
+        role: response.data.role || 'USER',
       });
+      setIsAdmin(response.data.role === 'ADMIN');
       setTwoFactorEnabled(response.data.twoFactorEnabled || false);
+      if (response.data.role === 'ADMIN') {
+        fetchAllUsers();
+      }
     } catch (error) {
       console.error('Error fetching user profile:', error);
       toast.error(error.response?.data?.message || 'Failed to load profile');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAllUsers = async () => {
+    const token = getAuthToken();
+    if (!token) return;
+
+    try {
+      const response = await axios.get(`${API_URL}/admin/users`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setUsers(response.data);
+    } catch (error) {
+      console.error('Error fetching all users:', error);
+      toast.error(error.response?.data?.message || 'Failed to load users');
     }
   };
 
@@ -322,6 +345,62 @@ const Settings = () => {
     toast.info('Data export functionality is not yet implemented.');
   };
 
+  const handleEditUser = (user) => {
+    setEditingUser({ ...user });
+  };
+
+  const handleUpdateUser = async (e) => {
+    e.preventDefault();
+    const token = getAuthToken();
+    if (!token) {
+      toast.error('You are not authenticated');
+      navigate('/login');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await axios.put(
+        `${API_URL}/admin/update/users/${editingUser.id}`,
+        editingUser,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success('User updated successfully!');
+      setEditingUser(null);
+      await fetchAllUsers();
+    } catch (error) {
+      console.error('Error updating user:', error);
+      toast.error(error.response?.data?.message || 'Failed to update user');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId) => {
+    const token = getAuthToken();
+    if (!token) {
+      toast.error('You are not authenticated');
+      navigate('/login');
+      return;
+    }
+
+    if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+      setLoading(true);
+      try {
+        await axios.delete(`${API_URL}/admin/delete/users/${userId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        toast.success('User deleted successfully!');
+        await fetchAllUsers();
+      } catch (error) {
+        console.error('Error deleting user:', error);
+        toast.error(error.response?.data?.message || 'Failed to delete user');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div style={styles.loading}>
@@ -368,10 +447,9 @@ const Settings = () => {
           </div>
 
           <div style={styles.contentWrapper}>
-            {/* Sticky Sidebar Navigation */}
             <div style={styles.sidebar}>
               <div style={styles.navContainer}>
-                {['profile', 'security', 'appearance', 'accounts'].map((tab) => (
+                {['profile', 'security', 'appearance', 'accounts', ...(isAdmin ? ['admin'] : [])].map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
@@ -379,20 +457,16 @@ const Settings = () => {
                     className="action-button"
                     data-default-bg="#00c4b4"
                   >
-                    {tab.charAt(0).toUpperCase() + tab.slice(1).replace('accounts', 'Accounts')}
+                    {tab.charAt(0).toUpperCase() + tab.slice(1).replace('accounts', 'Accounts').replace('admin', 'Admin Panel')}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Scrollable Main Content */}
             <div style={styles.content}>
-              {/* Profile Tab */}
               {activeTab === 'profile' && (
                 <div style={styles.tabContent}>
                   <h2 style={styles.cardTitle}>Profile Information</h2>
-
-                  {/* Profile Picture */}
                   <div style={styles.profilePictureContainer}>
                     <div style={styles.profilePicture}>
                       {user.profilePicture ? (
@@ -448,8 +522,6 @@ const Settings = () => {
                       <p style={styles.hintText}>JPG, GIF, or PNG. Max size 2MB</p>
                     </div>
                   </div>
-
-                  {/* Profile Form */}
                   <form onSubmit={handleProfileUpdate} style={styles.form}>
                     <div style={styles.formGrid}>
                       <div style={styles.formGroup}>
@@ -633,12 +705,9 @@ const Settings = () => {
                 </div>
               )}
 
-              {/* Security Tab */}
               {activeTab === 'security' && (
                 <div style={styles.tabContent}>
                   <h2 style={styles.cardTitle}>Security Settings</h2>
-
-                  {/* Change Password */}
                   <div style={styles.card}>
                     <h3 style={styles.subTitle}>Change Password</h3>
                     <form onSubmit={handlePasswordChange} style={styles.form}>
@@ -687,8 +756,6 @@ const Settings = () => {
                       </div>
                     </form>
                   </div>
-
-                  {/* Two-Factor Authentication */}
                   <div style={styles.card}>
                     <div style={styles.flexBetween}>
                       <div>
@@ -708,8 +775,6 @@ const Settings = () => {
                       {twoFactorEnabled ? 'Two-factor authentication is enabled.' : 'Two-factor authentication is disabled.'}
                     </p>
                   </div>
-
-                  {/* Active Sessions */}
                   <div style={styles.card}>
                     <h3 style={styles.subTitle}>Active Sessions</h3>
                     <p style={styles.hintText}>Manage your active login sessions (coming soon).</p>
@@ -720,12 +785,9 @@ const Settings = () => {
                 </div>
               )}
 
-              {/* Appearance Tab */}
               {activeTab === 'appearance' && (
                 <div style={styles.tabContent}>
                   <h2 style={styles.cardTitle}>Appearance Settings</h2>
-
-                  {/* Theme Preferences */}
                   <div style={styles.card}>
                     <h3 style={styles.subTitle}>Theme Preferences</h3>
                     <div style={styles.formGrid}>
@@ -743,8 +805,6 @@ const Settings = () => {
                       </div>
                     </div>
                   </div>
-
-                  {/* Language Preferences */}
                   <div style={styles.card}>
                     <h3 style={styles.subTitle}>Language & Region</h3>
                     <div style={styles.formGrid}>
@@ -774,8 +834,6 @@ const Settings = () => {
                       </div>
                     </div>
                   </div>
-
-                  {/* Notification Preferences */}
                   <div style={styles.card}>
                     <h3 style={styles.subTitle}>Notification Preferences</h3>
                     <div style={styles.checkboxGroup}>
@@ -801,12 +859,9 @@ const Settings = () => {
                 </div>
               )}
 
-              {/* Accounts Tab */}
               {activeTab === 'accounts' && (
                 <div style={styles.tabContent}>
                   <h2 style={styles.cardTitle}>Account Management</h2>
-
-                  {/* Deactivate Account */}
                   <div style={styles.card}>
                     <div style={styles.flexBetween}>
                       <div>
@@ -826,8 +881,6 @@ const Settings = () => {
                       </button>
                     </div>
                   </div>
-
-                  {/* Delete Account */}
                   <div style={styles.card}>
                     <div style={styles.flexBetween}>
                       <div>
@@ -847,8 +900,6 @@ const Settings = () => {
                       </button>
                     </div>
                   </div>
-
-                  {/* Export Data */}
                   <div style={styles.card}>
                     <div style={styles.flexBetween}>
                       <div>
@@ -868,6 +919,118 @@ const Settings = () => {
                       </button>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {activeTab === 'admin' && isAdmin && (
+                <div style={styles.tabContent}>
+                  <h2 style={styles.cardTitle}>Admin Panel</h2>
+                  <div style={styles.card}>
+                    <h3 style={styles.subTitle}>Manage Users</h3>
+                    {users.length === 0 ? (
+                      <div style={styles.noData}>No users found.</div>
+                    ) : (
+                      <div style={styles.userList}>
+                        {users.map((u) => (
+                          <div key={u.id} style={styles.userItem}>
+                            <div style={styles.userInfo}>
+                              <span style={styles.userName}>{u.name}</span>
+                              <span style={styles.userEmail}>{u.email}</span>
+                              <span style={styles.userRole}>{u.role}</span>
+                            </div>
+                            <div style={styles.userActions}>
+                              <button
+                                onClick={() => handleEditUser(u)}
+                                style={styles.actionButton}
+                                className="action-button"
+                                data-default-bg="#00c4b4"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteUser(u.id)}
+                                style={styles.deleteButton}
+                                className="action-button"
+                                data-default-bg="#00c4b4"
+                                disabled={u.id === user.id}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {editingUser && (
+                    <div style={styles.card}>
+                      <h3 style={styles.subTitle}>Edit User</h3>
+                      <form onSubmit={handleUpdateUser} style={styles.form}>
+                        <div style={styles.formGrid}>
+                          <div style={styles.formGroup}>
+                            <label style={styles.label}>Full Name</label>
+                            <input
+                              type="text"
+                              value={editingUser.name}
+                              onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
+                              style={styles.input}
+                              placeholder="Enter name"
+                            />
+                          </div>
+                          <div style={styles.formGroup}>
+                            <label style={styles.label}>Email</label>
+                            <input
+                              type="email"
+                              value={editingUser.email}
+                              onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                              style={styles.input}
+                              placeholder="Enter email"
+                            />
+                          </div>
+                          <div style={styles.formGroup}>
+                            <label style={styles.label}>Role</label>
+                            <select
+                              value={editingUser.role}
+                              onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
+                              style={styles.input}
+                            >
+                              <option value="USER">User</option>
+                              <option value="ADMIN">Admin</option>
+                            </select>
+                          </div>
+                          <div style={styles.formGroup}>
+                            <label style={styles.label}>Phone Number</label>
+                            <input
+                              type="tel"
+                              value={editingUser.phone || ''}
+                              onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
+                              style={styles.input}
+                              placeholder="Enter phone number"
+                            />
+                          </div>
+                        </div>
+                        <div style={styles.buttonGroup}>
+                          <button
+                            type="submit"
+                            style={styles.actionButton}
+                            className="action-button"
+                            disabled={loading}
+                            data-default-bg="#00c4b4"
+                          >
+                            Save Changes
+                          </button>
+                          <button
+                            onClick={() => setEditingUser(null)}
+                            style={styles.deleteButton}
+                            className="action-button"
+                            data-default-bg="#00c4b4"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1284,6 +1447,43 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     fontWeight: 500,
+  },
+  userList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1rem',
+  },
+  userItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '1rem',
+    background: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: '8px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+  },
+  userInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.3rem',
+  },
+  userName: {
+    fontSize: '1rem',
+    fontWeight: 600,
+    color: '#1f2937',
+  },
+  userEmail: {
+    fontSize: '0.9rem',
+    color: '#6b7280',
+  },
+  userRole: {
+    fontSize: '0.85rem',
+    color: '#00c4b4',
+    fontWeight: 500,
+  },
+  userActions: {
+    display: 'flex',
+    gap: '0.5rem',
   },
 };
 
