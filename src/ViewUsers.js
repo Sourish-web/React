@@ -426,59 +426,53 @@ function ViewUsers() {
         </div>
 
         {/* Chart Section */}
-        <div style={styles.chartSection}>
-          <div style={styles.chartContainer} ref={chartContainerRef}>
-            <div style={styles.chartHeader}>
-              <h3 style={styles.chartTitle}>Spending Overview</h3>
-              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                <select
-                  style={styles.chartSelect}
-                  value={timeRange}
-                  onChange={(e) => setTimeRange(e.target.value)}
-                >
-                  <option>Last 7 Days</option>
-                  <option>Last 30 Days</option>
-                  <option>Last 90 Days</option>
-                </select>
-                <button
-                  style={styles.actionButton}
-                  onClick={() => setUseStaticData(!useStaticData)}
-                >
-                  {useStaticData ? "Use Backend Data" : "Use Static Data"}
-                </button>
-              </div>
-            </div>
-            <div style={styles.chart}>
-              {chartData.length > 0 ? (
-                <>
-                  <div style={{ marginBottom: "1rem", color: "#64748b", fontSize: "0.875rem" }}>
-                    Chart Data: {JSON.stringify(chartData)}
-                  </div>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <AreaChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                      <YAxis axisLine={false} tickLine={false} />
-                      <Tooltip />
-                      <Area
-                        type="monotone"
-                        dataKey="value"
-                        stroke="#7c3aed"
-                        fill="#ede9fe"
-                        strokeWidth={2}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </>
-              ) : (
-                <p style={{ color: "#64748b", fontSize: "0.875rem", textAlign: "center", padding: "2rem" }}>
-                  No spending data available.
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
+<div style={styles.chartSection}>
+  <div style={styles.chartContainer} ref={chartContainerRef}>
+    <div style={styles.chartHeader}>
+      <h3 style={styles.chartTitle}>Spending Overview</h3>
+      <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+        <select
+          style={styles.chartSelect}
+          value={timeRange}
+          onChange={(e) => setTimeRange(e.target.value)}
+        >
+          <option>Last 7 Days</option>
+          <option>Last 30 Days</option>
+          <option>Last 90 Days</option>
+        </select>
+        <button
+          style={styles.actionButton}
+          onClick={() => setUseStaticData(!useStaticData)}
+        >
+          {useStaticData ? "Use Backend Data" : "Use Static Data"}
+        </button>
+      </div>
+    </div>
+    <div style={styles.chart}>
+      {chartData.length > 0 ? (
+        <ResponsiveContainer width="100%" height={300}>
+          <AreaChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+            <XAxis dataKey="name" axisLine={false} tickLine={false} />
+            <YAxis axisLine={false} tickLine={false} />
+            <Tooltip />
+            <Area
+              type="monotone"
+              dataKey="value"
+              stroke="#7c3aed"
+              fill="#ede9fe"
+              strokeWidth={2}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      ) : (
+        <p style={{ color: "#64748b", fontSize: "0.875rem", textAlign: "center", padding: "2rem" }}>
+          No spending data available.
+        </p>
+      )}
+    </div>
+  </div>
+</div>
         {/* Features and Activity */}
         <div style={styles.gridContainer}>
           {/* Features */}

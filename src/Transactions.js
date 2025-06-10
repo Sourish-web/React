@@ -218,9 +218,9 @@ const Transactions = () => {
         <nav style={styles.sidebar}>
           <ul style={styles.sidebarList}>
             {[
-              { text: "Dashboard", icon: <FiHome size={18} />, path: "/dashboard" },
+              { text: "Dashboard", icon: <FiHome size={18} />, path: "/Users" },
               { text: "Transactions", icon: <FiStar size={18} />, path: "/transactions", active: true },
-              { text: "Budgets", icon: <FiCalendar size={18} />, path: "/budgets" },
+              { text: "Budgets", icon: <FiCalendar size={18} />, path: "/budget" },
               { text: "Goals", icon: <FiFlag size={18} />, path: "/goals" },
               { text: "Reports", icon: <FiBarChart size={18} />, path: "/reports" },
             ].map((item) => (

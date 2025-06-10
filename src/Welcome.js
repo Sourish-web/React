@@ -1,3 +1,4 @@
+
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -45,6 +46,28 @@ function WelcomePage() {
         link.style.color = "#9ca3af";
       });
     });
+
+    // Add animation for progress bar
+    const progressFill = document.querySelector(".progress-fill");
+    if (progressFill) {
+      progressFill.style.width = "0%";
+      setTimeout(() => {
+        progressFill.style.width = "60%";
+      }, 300);
+    }
+
+    // Add hover effects for transaction items
+    const transactionItems = document.querySelectorAll(".transaction-item");
+    transactionItems.forEach((item) => {
+      item.addEventListener("mouseenter", () => {
+        item.style.backgroundColor = "#f1f5f9";
+        item.style.transform = "translateX(5px)";
+      });
+      item.addEventListener("mouseleave", () => {
+        item.style.backgroundColor = "transparent";
+        item.style.transform = "translateX(0)";
+      });
+    });
   }, []);
 
   return (
@@ -86,30 +109,33 @@ function WelcomePage() {
           <div style={styles.dashboardContent}>
             <div style={styles.expenseSummary}>
               <h4 style={styles.summaryTitle}>Total Expenses</h4>
-              <p style={styles.summaryAmount}>$1,245.30</p>
+              <p style={styles.summaryAmount}>₹500000</p>
               <p style={styles.summaryPeriod}>This Month</p>
             </div>
             <div style={styles.budgetProgress}>
               <p style={styles.progressTitle}>Budget Progress</p>
               <div style={styles.progressBar}>
-                <div style={{ ...styles.progressFill, width: "60%" }}></div>
+                <div style={styles.progressFill} className="progress-fill"></div>
               </div>
-              <p style={styles.progressText}>60% of $2,000 budget used</p>
+              <p style={styles.progressText}>60% of ₹1,70,000 budget used</p>
             </div>
             <div style={styles.transactions}>
               <p style={styles.transactionsTitle}>Recent Transactions</p>
               <ul style={styles.transactionList}>
-                <li style={styles.transactionItem}>
+                <li style={styles.transactionItem} className="transaction-item">
+                  <span style={styles.transactionIcon}>🛒</span>
                   <span>Grocery Store</span>
-                  <span style={styles.transactionAmount}>-$85.20</span>
+                  <span style={styles.transactionAmount}>−₹7,242.00</span>
                 </li>
-                <li style={styles.transactionItem}>
+                <li style={styles.transactionItem} className="transaction-item">
+                  <span style={styles.transactionIcon}>☕</span>
                   <span>Coffee Shop</span>
-                  <span style={styles.transactionAmount}>-$12.50</span>
+                  <span style={styles.transactionAmount}>−₹1,062.50</span>
                 </li>
-                <li style={styles.transactionItem}>
+                <li style={styles.transactionItem} className="transaction-item">
+                  <span style={styles.transactionIcon}>💼</span>
                   <span>Salary</span>
-                  <span style={{ ...styles.transactionAmount, color: "#10b981" }}>+ $3,000.00</span>
+                  <span style={{ ...styles.transactionAmount, color: "#10b981" }}>+₹2,55,000.00</span>
                 </li>
               </ul>
             </div>
@@ -117,6 +143,7 @@ function WelcomePage() {
         </div>
       </section>
 
+      {/* Rest of the sections (unchanged) */}
       {/* Features Section */}
       <section style={styles.features}>
         <h3 style={styles.sectionTitle}>Powerful Features</h3>
@@ -219,7 +246,7 @@ function WelcomePage() {
           <div style={styles.testimonialItem}>
             <div style={styles.testimonialRating}>★★★★★</div>
             <p style={styles.testimonialText}>
-              "ExpenseMate helped me pay off $15,000 in debt in just 8 months. The
+              "ExpenseMate helped me pay off ₹12,75,000 in debt in just 8 months. The
               budgeting tools are incredibly intuitive and powerful."
             </p>
             <div style={styles.testimonialAuthor}>
@@ -271,7 +298,7 @@ function WelcomePage() {
           <div style={styles.pricingCard}>
             <h4 style={styles.pricingTitle}>Free</h4>
             <p style={styles.pricingPrice}>
-              $0<span style={styles.pricingPeriod}>/month</span>
+              ₹0<span style={styles.pricingPeriod}>/month</span>
             </p>
             <ul style={styles.pricingFeatures}>
               <li style={styles.pricingFeature}>Track expenses & income</li>
@@ -287,7 +314,7 @@ function WelcomePage() {
             <div style={styles.featuredBadge}>Most Popular</div>
             <h4 style={styles.pricingTitle}>Pro</h4>
             <p style={styles.pricingPrice}>
-              $9.99<span style={styles.pricingPeriod}>/month</span>
+              ₹849.15<span style={styles.pricingPeriod}>/month</span>
             </p>
             <ul style={styles.pricingFeatures}>
               <li style={styles.pricingFeature}>Everything in Free, plus:</li>
@@ -307,7 +334,7 @@ function WelcomePage() {
           <div style={styles.pricingCard}>
             <h4 style={styles.pricingTitle}>Family</h4>
             <p style={styles.pricingPrice}>
-              $14.99<span style={styles.pricingPeriod}>/month</span>
+              ₹1,274.15<span style={styles.pricingPeriod}>/month</span>
             </p>
             <ul style={styles.pricingFeatures}>
               <li style={styles.pricingFeature}>Everything in Pro, plus:</li>
@@ -552,94 +579,117 @@ const styles = {
   },
   heroScreenshot: {
     width: "40%",
-    height: "400px",
-    backgroundColor: "#ffffff",
+    height: "450px",
+    background: "linear-gradient(135deg, #f9fafb 0%, #e5e7eb 100%)",
     borderRadius: "16px",
-    boxShadow: "0 10px 20px rgba(0,0,0,0.1)",
-    border: "2px solid #4f46e5",
+    boxShadow: "0 12px 24px rgba(0,0,0,0.15), 0 4px 8px rgba(79, 70, 229, 0.2)",
+    border: "1px solid rgba(79, 70, 229, 0.1)",
     display: "flex",
     flexDirection: "column",
     overflow: "hidden",
   },
   dashboardHeader: {
-    backgroundColor: "#4f46e5",
-    padding: "0.75rem 1rem",
+    background: "linear-gradient(90deg, #4f46e5 0%, #6366f1 100%)",
+    padding: "1rem 1.5rem",
     display: "flex",
     alignItems: "center",
+    borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
   },
   dashboardLogo: {
-    fontSize: "1.2rem",
+    fontSize: "1.4rem",
     fontWeight: 800,
     color: "#ffffff",
     margin: 0,
+    letterSpacing: "0.02em",
   },
   dashboardContent: {
-    padding: "1rem",
-    display: "flex",
-    flexDirection: "column",
-    gap: "1rem",
+    padding: "1.5rem",
+    display: "grid",
+    gridTemplateColumns: "1fr",
+    gap: "1.5rem",
     flex: 1,
+    background: "#ffffff",
+    borderRadius: "0 0 16px 16px",
   },
   expenseSummary: {
-    backgroundColor: "#f9fafb",
-    borderRadius: "8px",
-    padding: "1rem",
+    background: "linear-gradient(135deg, #ffffff 0%, #f9fafb 100%)",
+    borderRadius: "12px",
+    padding: "1.5rem",
     textAlign: "center",
+    boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
+    transition: "transform 0.2s ease",
   },
   summaryTitle: {
-    fontSize: "0.9rem",
+    fontSize: "1rem",
     fontWeight: 600,
-    color: "#4b5563",
+    color: "#374151",
     margin: 0,
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
   },
   summaryAmount: {
-    fontSize: "1.5rem",
-    fontWeight: 700,
-    color: "#111827",
-    margin: "0.25rem 0",
+    fontSize: "2rem",
+    fontWeight: 800,
+    color: "#1f2937",
+    margin: "0.5rem 0",
+    fontFamily: "'Roboto', sans-serif",
   },
   summaryPeriod: {
-    fontSize: "0.8rem",
+    fontSize: "0.85rem",
     color: "#6b7280",
     margin: 0,
+    fontStyle: "italic",
   },
   budgetProgress: {
     display: "flex",
     flexDirection: "column",
-    gap: "0.5rem",
+    gap: "0.75rem",
+    background: "linear-gradient(135deg, #ffffff 0%, #f9fafb 100%)",
+    borderRadius: "12px",
+    padding: "1.5rem",
+    boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
   },
   progressTitle: {
-    fontSize: "0.9rem",
+    fontSize: "1rem",
     fontWeight: 600,
-    color: "#4b5563",
+    color: "#374151",
     margin: 0,
+    textTransform: "uppercase",
   },
   progressBar: {
     backgroundColor: "#e5e7eb",
-    borderRadius: "10px",
-    height: "10px",
+    borderRadius: "12px",
+    height: "12px",
     overflow: "hidden",
+    border: "1px solid #d1d5db",
   },
   progressFill: {
-    backgroundColor: "#4f46e5",
+    background: "linear-gradient(90deg, #4f46e5 0%, #10b981 100%)",
     height: "100%",
-    transition: "width 0.3s ease",
+    width: "60%",
+    transition: "width 1s ease-in-out",
   },
   progressText: {
-    fontSize: "0.8rem",
+    fontSize: "0.9rem",
     color: "#6b7280",
     margin: 0,
+    fontWeight: 500,
   },
   transactions: {
     display: "flex",
     flexDirection: "column",
-    gap: "0.5rem",
+    gap: "0.75rem",
+    background: "linear-gradient(135deg, #ffffff 0%, #f9fafb 100%)",
+    borderRadius: "12px",
+    padding: "1.5rem",
+    boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
   },
   transactionsTitle: {
-    fontSize: "0.9rem",
+    fontSize: "1rem",
     fontWeight: 600,
-    color: "#4b5563",
+    color: "#374151",
     margin: 0,
+    textTransform: "uppercase",
   },
   transactionList: {
     listStyle: "none",
@@ -647,17 +697,26 @@ const styles = {
     margin: 0,
     display: "flex",
     flexDirection: "column",
-    gap: "0.5rem",
+    gap: "0.75rem",
   },
   transactionItem: {
     display: "flex",
+    alignItems: "center",
     justifyContent: "space-between",
-    fontSize: "0.85rem",
+    fontSize: "0.9rem",
     color: "#4b5563",
+    padding: "0.75rem",
+    borderRadius: "8px",
+    transition: "background-color 0.2s ease, transform 0.2s ease",
+  },
+  transactionIcon: {
+    fontSize: "1.2rem",
+    marginRight: "0.75rem",
   },
   transactionAmount: {
     fontWeight: 600,
     color: "#dc2626",
+    fontFamily: "'Roboto', sans-serif",
   },
   heroTitle: {
     fontSize: "3.5rem",

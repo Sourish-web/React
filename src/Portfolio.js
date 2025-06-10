@@ -531,8 +531,8 @@ const Portfolio = () => {
         <nav style={styles.sidebar}>
           <ul style={styles.sidebarList}>
             {[
-              { text: "Dashboard", icon: <FiHome size={18} />, path: "/dashboard" },
-              { text: "Budgets", icon: <FiCalendar size={18} />, path: "/budgets" },
+              { text: "Dashboard", icon: <FiHome size={18} />, path: "/Users" },
+              { text: "Budgets", icon: <FiCalendar size={18} />, path: "/budget" },
               { text: "Transactions", icon: <FiDollarSign size={18} />, path: "/transactions" },
               { text: "Goals", icon: <FiFlag size={18} />, path: "/goals" },
               { text: "Reports", icon: <FiBarChart size={18} />, path: "/reports" },

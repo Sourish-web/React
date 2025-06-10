@@ -50,7 +50,8 @@ const Reports = () => {
     }
     try {
       setLoading(true);
-      const response = await axios.get(`${API_URL}/reports/data?quarter=${selectedFilter}`, {
+      const response = await axios.get(`${API_URL}/reports/data`, {
+        params: { quarter: selectedFilter === "All" ? null : selectedFilter },
         headers: { Authorization: `Bearer ${token}` },
       });
       console.log("Report Data:", response.data);
@@ -83,13 +84,14 @@ const Reports = () => {
     }
     try {
       const response = await axios.get(`${API_URL}/reports/export/pdf`, {
+        params: { quarter: selectedFilter === "All" ? null : selectedFilter },
         headers: { Authorization: `Bearer ${token}` },
         responseType: "blob",
       });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `transactions_budgets_${Date.now()}.pdf`);
+      link.setAttribute("download", `transactions_budgets_${Date.now()}_${selectedFilter}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -107,13 +109,14 @@ const Reports = () => {
     }
     try {
       const response = await axios.get(`${API_URL}/reports/export/csv`, {
+        params: { quarter: selectedFilter === "All" ? null : selectedFilter },
         headers: { Authorization: `Bearer ${token}` },
         responseType: "blob",
       });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `transactions_budgets_${Date.now()}.csv`);
+      link.setAttribute("download", `transactions_budgets_${Date.now()}_${selectedFilter}.csv`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -158,8 +161,8 @@ const Reports = () => {
       title: { 
         display: true, 
         text: budgetTotal > 0 
-          ? `Budget Breakdown (₹${budgetTotal.toLocaleString("en-IN")})` 
-          : "Budget Breakdown (No Data)" 
+          ? `Budget Breakdown (₹${budgetTotal.toLocaleString("en-IN")}) - ${selectedFilter}` 
+          : `Budget Breakdown (No Data) - ${selectedFilter}` 
       },
       tooltip: {
         enabled: budgetTotal > 0,
@@ -208,8 +211,8 @@ const Reports = () => {
       title: { 
         display: true, 
         text: expenseTotal > 0 
-          ? `Expense Breakdown (₹${expenseTotal.toLocaleString("en-IN")})` 
-          : "Expense Breakdown (No Data)" 
+          ? `Expense Breakdown (₹${expenseTotal.toLocaleString("en-IN")}) - ${selectedFilter}` 
+          : `Expense Breakdown (No Data) - ${selectedFilter}` 
       },
       tooltip: {
         enabled: expenseTotal > 0,
