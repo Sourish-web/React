@@ -12,6 +12,7 @@ import Goal from './Goal';
 import Subscription from './Subscription';
 import Settings from './Settings';
 import CombinedTracker from './CombinedTracker';
+import ForgotPassword from './ForgotPassword';
 import AuthenticatedLayout from './AuthenticatedLayout';
 import ProtectedRoute from './ProtectedRoute';
 
@@ -23,6 +24,7 @@ function App() {
         <Route path="/" element={<Welcome />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
 
         {/* Authenticated Routes */}
         <Route element={<AuthenticatedLayout />}>
@@ -30,7 +32,7 @@ function App() {
             path="/dashboard"
             element={
               <ProtectedRoute>
-                <div>Dashboard Page</div>
+                <div className="p-6">Dashboard Page</div>
               </ProtectedRoute>
             }
           />
@@ -107,6 +109,9 @@ function App() {
             }
           />
         </Route>
+
+        {/* 404 Route */}
+        <Route path="*" element={<div className="p-6 text-center text-2xl text-gray-900">404 - Page Not Found</div>} />
       </Routes>
     </Router>
   );

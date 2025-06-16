@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import Cookies from "universal-cookie";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
 function Login() {
   const [password, setPasswordValue] = useState("");
@@ -141,9 +141,9 @@ function Login() {
             </div>
           </div>
           <div style={styles.forgotPassword}>
-            <a href="#" style={styles.forgotLink}>
+            <Link to="/forgot-password" style={styles.forgotLink}>
               Forgot Password?
-            </a>
+            </Link>
           </div>
           <button
             type="submit"
